@@ -1,6 +1,7 @@
-from time import time
 import functools
-
+from time import time
+import types
+from typing import TypeVar, Callable
 
 def time_me(func):
     @functools.wraps(func)
@@ -11,7 +12,6 @@ def time_me(func):
         return result
 
     return wrapper
-
 
 class Timer:
     def __init__(self):
@@ -26,8 +26,7 @@ class Timer:
             print(f'{key}: {current_time-last_time} sec passed. ')
         self.timers[key] = current_time
 
-
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = ''):
+def print_progress_bar(iteration, total, prefix ='', suffix ='', decimals = 1, length = 100, fill ='█', printEnd =''):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -47,4 +46,49 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     # Print New Line on Complete
     if iteration == total:
         print()
+
+
+R = TypeVar('R')
+
+
+def dict_param(func: Callable[..., R]) -> Callable[..., R]:
+    """
+    Transforms a function which gets a dictionary as a single parameter, to be able to get instead named
+    parameters. For example, after decorating
+    @dict_param
+    def foo(d: dict):
+        ...
+
+    the following calls will be the same:
+        foo(dict(a=1, b=2, c='3'))  =  foo(a=1, b=2, c='3')
+
+    It similarly works for functions of objects, namely:
+        foo(self, dict(a=1, b=2, c='3'))  =  foo(self, a=1, b=2, c='3')
+    """
+    if isinstance(func, types.FunctionType):
+        @functools.wraps(func)
+        def wrapper(self, *arg, **index_values) -> R:
+            if len(arg) > 1:
+                raise Exception('should not have more than 1 argument')
+            if len(arg) == 1:
+                if type(arg[0]) != dict:
+                    raise Exception('The single argument for this function must be a dictionary')
+                if len(index_values) > 0:
+                    raise Exception('If these is a dictionary argument, you cannot pass more named arguments')
+                index_values = arg[0]
+            return func(self, index_values)
+    else:
+        @functools.wraps(func)
+        def wrapper(*arg, **index_values) -> R:
+            if len(arg) > 1:
+                raise Exception('should not have more than 1 argument')
+            if len(arg) == 1:
+                if type(arg[0]) != dict:
+                    raise Exception('The single argument for this function must be a dictionary')
+                if len(index_values) > 0:
+                    raise Exception('If these is a dictionary argument, you cannot pass more named arguments')
+                index_values = arg[0]
+            return func(index_values)
+
+    return wrapper
 
