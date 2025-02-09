@@ -14,7 +14,7 @@ the image into that output. We can use these weights to draw an image and "see" 
 
 In the case where we have a single linear layer, so there are 10 outputs, and each correspond 
 to a different layer, we get the following image:
-<p align="center"><img src="mnist_filters.png" width="600"/></p>
+<p align="center"><img src="media/mnist_filters.png" width="600"/></p>
 
 ## 2D separation
 
@@ -58,7 +58,7 @@ any mid layer which has output 2.
 
 ### Classifying more labels
 
-Here I used network with dimension $(28\times 28)\to 2 \to \#labels$.
+Here I used network with dimension $(28\times 28)\to 2 \to \text{num_labels}$.
 
 1. Classify 0\1\2: With a single epoch:
    - Test error rate $\sim \frac{1}{3}$ which is way better than the $\frac{2}{3}$ for random guesses.
