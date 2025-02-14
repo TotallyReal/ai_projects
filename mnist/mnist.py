@@ -19,7 +19,8 @@ from model_tester import test_model, train_model#, collect_train_progress
 import numpy as np
 
 from models import SimpleClassifier
-from visualization import scatter_animation
+from visualization import scatter_animation, plot_filters
+import os
 
 
 timer.time(msg='finish imports')
@@ -73,12 +74,12 @@ class MnistParameters:
         assert self.epochs > 0
 
 params = MnistParameters(
-    seed=1,
+    seed=2,
     up_to_label=2,
     learning_rate=0.001,
-    hidden=(2,),
+    hidden=(10,),
     batch_size=64,
-    epochs=1)
+    epochs=50)
 
 # Prepare data
 mnist_data = MnistData()
@@ -145,21 +146,43 @@ class OutputCollector:
 
 # <editor-fold desc=" ------------------------ Training with animation on 2D outputs ------------------------">
 
-collector = OutputCollector(model=model, test_loader=test_loader, up_to_label=params.up_to_label)
-
-train_model(model=model, data_loader=train_loader, train_size=train_size,
-            epochs=params.epochs, learning_rate=params.learning_rate,
-            train_step_callback=collector.progress_callback)
-
-hidden_str = '_'.join(str(d) for d in params.hidden)
-collector.generate_animation(save_animation_file=f'media/labels_{params.up_to_label}_hidden_{hidden_str}')
+# collector = OutputCollector(model=model, test_loader=test_loader, up_to_label=params.up_to_label)
+#
+# train_model(model=model, data_loader=train_loader, train_size=train_size,
+#             epochs=params.epochs, learning_rate=params.learning_rate,
+#             train_step_callback=collector.progress_callback)
+#
+# hidden_str = '_'.join(str(d) for d in params.hidden)
+# collector.generate_animation(save_animation_file=f'media/labels_{params.up_to_label}_hidden_{hidden_str}')
 
 # </editor-fold>
 
 # <editor-fold desc=" ------------------------ Plot filters from first layer ------------------------">
 
-# arr = model.get_linear_layer(0).weight.detach().cpu().numpy().reshape(params.up_to_label, 28, 28)
-# plot_filters(arr)
+def plot_first_layer_images(epoch: int, num_data_points: int):
+    if num_data_points>0:
+        return
+    weights = model.get_linear_layer(1).weight.detach().cpu().numpy()
+    arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
+    arr = arr.reshape(arr.shape[0], 28, 28)
+    # plot_filters(arr)
+
+    fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(5 * 2, 2 * 2))
+    fig.suptitle(f'Epoch {epoch}')
+    axes = axes.flatten()
+
+    for i, ax in enumerate(axes):
+        ax.imshow(arr[i], cmap='gray')
+        ax.set_title(f"{weights[0][i]:.3f} ; {weights[1][i]:.3f}", fontsize=12)
+        ax.axis('off')
+    save_path = f'images/seed{params.seed}/filters_{epoch}'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+train_model(model=model, data_loader=train_loader, train_size=train_size,
+            epochs=params.epochs, learning_rate=params.learning_rate,
+            train_step_callback=plot_first_layer_images)
 
 # </editor-fold>
 
