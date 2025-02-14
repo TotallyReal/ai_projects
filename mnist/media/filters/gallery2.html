@@ -1,11 +1,11 @@
-<img id="gallery" src="filters_0.png" width="800">
+<img id="gallery" src="seed2/filters_0.png" width="800">
 
 <script>
 let index = 0;  // Start from 0
 
 function updateImage(newIndex) {
     let testImg = new Image();
-    testImg.src = `filters_${newIndex}.png`;
+    testImg.src = `seed2/filters_${newIndex}.png`;
 
     testImg.onload = function() {
         console.log(`Successfully loaded filters_${newIndex}.png`);

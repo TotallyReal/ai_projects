@@ -1,25 +1,25 @@
 import functools
-from abc import abstractmethod
 import copy
-
-import matplotlib.pyplot as plt
 
 from misc import Timer
 
 timer = Timer()
 timer.time(print_time=False)
 
+from model_tester import test_model, train_model#, collect_train_progress
+import numpy as np
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 from torchvision import datasets, transforms
 import torch
 from torch.utils.data import DataLoader, Subset
 from xp_data import XpData
-from model_tester import test_model, train_model#, collect_train_progress
-import numpy as np
 
 from models import SimpleClassifier
-from visualization import scatter_animation, plot_filters
+from mnist import visualization
+import visualization
+
+
 import os
 
 
@@ -69,22 +69,25 @@ class MnistParameters:
     def __post_init__(self):
         assert self.learning_rate > 0
         assert 2<=self.up_to_label<=10
+        if isinstance(self.hidden, int):
+            self.hidden = (self.hidden,)
         assert all([d>0 for d in self.hidden])
         assert self.batch_size > 0
         assert self.epochs > 0
 
 params = MnistParameters(
-    seed=2,
+    seed=200,
     up_to_label=2,
     learning_rate=0.001,
-    hidden=(10,),
-    batch_size=64,
-    epochs=50)
+    hidden=(),
+    batch_size=1024,
+    epochs=1)
 
-# Prepare data
+# <editor-fold desc=" ------------------------ Prepare data ------------------------">
+
 mnist_data = MnistData()
 
-train_data, _ = mnist_data.restricted_data(up_to_label=params.up_to_label)
+train_data, test_data = mnist_data.restricted_data(up_to_label=params.up_to_label)
 train_size = len(train_data)
 train_loader = mnist_data.train_loader(up_to_label=params.up_to_label, batch_size=params.batch_size)
 test_loader = mnist_data.test_loader(up_to_label=params.up_to_label)
@@ -93,6 +96,26 @@ test_loader = mnist_data.test_loader(up_to_label=params.up_to_label)
 torch.manual_seed(params.seed)
 model = SimpleClassifier(dimensions=[28 * 28] + list(params.hidden) + [params.up_to_label])
 
+# </editor-fold>
+
+def plot_layer0_filters(model: SimpleClassifier):
+    arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
+    arr = arr.reshape(arr.shape[0], 28, 28)
+    visualization.plot_filters(arr)
+
+def collect_output(model: SimpleClassifier) -> Dict[torch.nn.Linear, np.ndarray]:
+    """
+    Creates an output collector for the linear layers
+    """
+    outputs = dict()
+
+    def _save_output(model, input, output):
+        outputs[model] = output
+
+    for linear_layer in model.linear_layers():
+        linear_layer.register_forward_hook(_save_output)
+
+    return outputs
 
 class OutputCollector:
     """
@@ -112,15 +135,11 @@ class OutputCollector:
         self.up_to_label = up_to_label
 
         # Make sure the linear layers retain their output
-        self.outputs = dict()
+        self.outputs = collect_output(model)
 
         self.progress_output = dict()
         for linear_layer in model.linear_layers():
-            linear_layer.register_forward_hook(self._save_output)
             self.progress_output[linear_layer] = {label: [] for label in range(self.up_to_label)}
-
-    def _save_output(self, model, input, output):
-        self.outputs[model] = output
 
     # After each learning step, run the model on the test data and collect the output
     def progress_callback(self, epoch: int, num_data_points: int):
@@ -141,48 +160,112 @@ class OutputCollector:
             for i, linear_layer in enumerate(self.model.linear_layers())
             if linear_layer.out_features == 2
         ]
-        scatter_animation(frames_data, save_animation_file=save_animation_file)
+        visualization.scatter_animation(frames_data, save_animation_file=save_animation_file)
 
 
 # <editor-fold desc=" ------------------------ Training with animation on 2D outputs ------------------------">
 
-# collector = OutputCollector(model=model, test_loader=test_loader, up_to_label=params.up_to_label)
-#
-# train_model(model=model, data_loader=train_loader, train_size=train_size,
-#             epochs=params.epochs, learning_rate=params.learning_rate,
-#             train_step_callback=collector.progress_callback)
-#
-# hidden_str = '_'.join(str(d) for d in params.hidden)
+collector = OutputCollector(model=model, test_loader=test_loader, up_to_label=params.up_to_label)
+
+train_model(model=model, data_loader=train_loader, train_size=train_size,
+            epochs=params.epochs, learning_rate=params.learning_rate,
+            train_step_callback=collector.progress_callback)
+
+hidden_str = '_'.join(str(d) for d in params.hidden)
+collector.generate_animation()
 # collector.generate_animation(save_animation_file=f'media/labels_{params.up_to_label}_hidden_{hidden_str}')
+
+exit(0)
 
 # </editor-fold>
 
 # <editor-fold desc=" ------------------------ Plot filters from first layer ------------------------">
+#
+# def plot_first_layer_images(epoch: int, num_data_points: int):
+#     if num_data_points>0:
+#         return
+#     weights = model.get_linear_layer(1).weight.detach().cpu().numpy()
+#     arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
+#     arr = arr.reshape(arr.shape[0], 28, 28)
+#     # plot_filters(arr)
+#
+#     fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(5 * 2, 2 * 2))
+#     fig.suptitle(f'Epoch {epoch}')
+#     axes = axes.flatten()
+#
+#     for i, ax in enumerate(axes):
+#         ax.imshow(arr[i], cmap='gray')
+#         ax.set_title(f"{weights[0][i]:.3f} ; {weights[1][i]:.3f}", fontsize=12)
+#         ax.axis('off')
+#     save_path = f'media/filters/seed{params.seed}/filters_{epoch}'
+#     os.makedirs(os.path.dirname(save_path), exist_ok=True)
+#     plt.savefig(save_path, dpi=300, bbox_inches='tight')
+#     plt.close()
+#
+# train_model(model=model, data_loader=train_loader, train_size=train_size,
+#             epochs=params.epochs, learning_rate=params.learning_rate,
+#             train_step_callback=plot_first_layer_images)
 
-def plot_first_layer_images(epoch: int, num_data_points: int):
-    if num_data_points>0:
-        return
-    weights = model.get_linear_layer(1).weight.detach().cpu().numpy()
-    arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
-    arr = arr.reshape(arr.shape[0], 28, 28)
-    # plot_filters(arr)
+# </editor-fold>
 
-    fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(5 * 2, 2 * 2))
-    fig.suptitle(f'Epoch {epoch}')
-    axes = axes.flatten()
+# <editor-fold desc=" ------------------------ Description ------------------------">
 
-    for i, ax in enumerate(axes):
-        ax.imshow(arr[i], cmap='gray')
-        ax.set_title(f"{weights[0][i]:.3f} ; {weights[1][i]:.3f}", fontsize=12)
-        ax.axis('off')
-    save_path = f'images/seed{params.seed}/filters_{epoch}'
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close()
 
+train_loader = DataLoader(Subset(train_data, range(10))  , batch_size=1, shuffle=True)
+
+# for layer in model.linear_layers():
+#     layer.weight.requires_grad = False
+#     layer.bias.requires_grad = False
+
+#
 train_model(model=model, data_loader=train_loader, train_size=train_size,
-            epochs=params.epochs, learning_rate=params.learning_rate,
-            train_step_callback=plot_first_layer_images)
+            epochs=params.epochs, learning_rate=params.learning_rate)
+#
+
+# arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
+# arr = arr.reshape(arr.shape[0], 28, 28)
+# plot_filters(arr)
+#
+# exit(0)
+
+weights0 = model.get_linear_layer(0).weight.detach().cpu().numpy()
+bias0 = model.get_linear_layer(0).bias.detach().cpu().numpy()
+weights0 = weights0.reshape(weights0.shape[0], 28, 28)
+
+linear_outputs = collect_output(model) # add hooks to collect output of linear layers
+model.eval()
+with torch.no_grad():
+    for X_test, Y_test in test_loader:
+        model_output = model(X_test)
+        break  # because I hate python!!!
+
+print('Train data:')
+train_error_rate = test_model(model, train_loader)
+print('Test data:')
+test_error_rate = test_model(model, test_loader)
+
+hidden_length = len(params.hidden)
+
+if hidden_length == 1:
+    weights1 = model.get_linear_layer(1).weight.detach().cpu().numpy()
+    visualization.plot_more_filters(
+        weights0=weights0, bias0=bias0, weights1=weights1,
+        inputs=X_test.numpy().squeeze(1), labels=Y_test,
+        outputs0=linear_outputs[model.get_linear_layer(0)],
+        outputs1=linear_outputs[model.get_linear_layer(1)],
+        )
+else:
+    outputs_last = linear_outputs[model.get_linear_layer(hidden_length)]
+    visualization.plot_more_filters2(
+        weights0=weights0, bias0=bias0,
+        inputs=X_test.numpy().squeeze(1), labels=Y_test,
+        outputs_first=linear_outputs[model.get_linear_layer(0)],
+        outputs_last=outputs_last,
+        )
+
+
+
+exit(0)
 
 # </editor-fold>
 

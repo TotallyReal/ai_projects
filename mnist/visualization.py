@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
 from typing import List, Tuple, Dict
+import mplcursors
 from matplotlib.patches import Rectangle
 
 def scatter_animation(data: List[Tuple[str, Dict[str, List[np.ndarray]]]], save_animation_file: str = ''):
@@ -83,24 +84,142 @@ def scatter_animation(data: List[Tuple[str, Dict[str, List[np.ndarray]]]], save_
 def plot_filters(arr :np.ndarray):
     """
     Plots up to 10 images in a grid.
-    Input should be of shape num_labels x n x n
+    Input should be of shape k x n x n
     """
-    num_labels = len(arr)
+    k = len(arr)
 
-    if num_labels <= 5:
-        n_rows = 1
-        n_cols = num_labels
-    else:
-        n_rows = 2
-        n_cols = int(np.ceil(num_labels / 2))
-    if num_labels == 9:
-        n_rows = 3
-        n_cols = 3
+    n_cols = 5
+    for i in range(5):
+        if k % i+1 == 0:
+            n_cols = i+1
+    n_rows = np.ceil(k/n_cols)
 
     fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(n_cols * 2, n_rows * 2))
     axes = axes.flatten()
 
-    for i, ax in enumerate(axes):
-        ax.imshow(arr[i], cmap='gray')
+    for img_arr, ax in zip(arr, axes):
+        ax.imshow(img_arr, cmap='gray')
         ax.axis('off')
+    plt.show()
+
+def plot_more_filters2(
+        weights0: np.ndarray, bias0: np.ndarray,
+        inputs: np.ndarray, labels:np.ndarray,
+        outputs_first: np.ndarray, outputs_last: np.ndarray):
+    """
+    Assumption: classifying 0/1 with a single hidden mid layer of size k
+
+    weights0: k x res x res
+    bias0:    k x 1
+    weights1: 2 x k
+
+    labels:   n x 1 over 0,1
+    outputs0: n x k
+    outputs1: n x 2
+    """
+
+
+    k = weights0.shape[0]
+    grid_width = max(k, 10)
+    grid_height = 5
+    plt.figure(figsize=(grid_width * 2, grid_height * 2))
+
+    filter_im = []
+
+    for i, cur_weights in enumerate(weights0):
+        ax = plt.subplot2grid((grid_height, grid_width), (0, i))
+        filter_im.append(ax.imshow(cur_weights, cmap='gray'))
+        ax.axis('off')
+        ax.set_title(f'bias={bias0[i]:.3f}')
+
+    # bar_ax = plt.subplot2grid((grid_height, grid_width), (1, 0), colspan=k, rowspan=1)
+    # bar_ax.set_ylim(-5, 5)
+    # bar_ax.set_xlim(-0.5, k - 0.5)
+    # bars = bar_ax.bar(list(range(k)), [0] * k)
+
+    input_ax = plt.subplot2grid((grid_height, grid_width), (2, grid_height-1), colspan = 2, rowspan=2)
+    input_img = input_ax.imshow(inputs[0], cmap='gray')
+
+    scatter_ax = plt.subplot2grid((grid_height, grid_width), (2, 0), colspan=grid_height - 2, rowspan=grid_height - 2)
+
+    scatter = scatter_ax.scatter(x=outputs_last[:, 0], y=outputs_last[:, 1], c=labels, cmap=plt.get_cmap("tab10"), s = 5)
+
+    def on_add(sel):
+        """Handles hover or click events to display the index or label of the point."""
+        # scatter_ax.set_title(f"Point index: {sel.index}, Label: {labels[sel.index]}")
+        result = outputs_first[sel.index]
+        input_img.set_data(inputs[sel.index])
+        for height, im in zip(result, filter_im):
+            if height >= 0:
+                # bar.set_color('blue')
+                im.set_cmap('gray')
+            else:
+                im.set_cmap('Reds')
+                # bar.set_color('red')
+
+    # Connect to the 'add' event for hover or click (any selection)
+    mplcursors.cursor(scatter, hover=True).connect("add", on_add)
+
+    plt.show()
+
+
+def plot_more_filters(
+        weights0: np.ndarray, bias0: np.ndarray, weights1: np.ndarray,
+        inputs: np.ndarray, labels:np.ndarray,
+        outputs0: np.ndarray, outputs1: np.ndarray):
+    """
+    Assumption: classifying 0/1 with a single hidden mid layer of size k
+
+    weights0: k x res x res
+    bias0:    k x 1
+    weights1: 2 x k
+
+    labels:   n x 1 over 0,1
+    outputs0: n x k
+    outputs1: n x 2
+    """
+
+
+    k = weights0.shape[0]
+    grid_width = max(k, 10)
+    grid_height = 5
+    plt.figure(figsize=(grid_width * 2, grid_height * 2))
+
+    filter_im = []
+
+    for i, cur_weights in enumerate(weights0):
+        ax = plt.subplot2grid((grid_height, grid_width), (0, i))
+        filter_im.append(ax.imshow(cur_weights, cmap='gray'))
+        ax.axis('off')
+        ax.set_title(f"{weights1[0][i]:.3f} : {weights1[1][i]:.3f}\nbias={bias0[i]:.3f}")
+
+    bar_ax = plt.subplot2grid((grid_height, grid_width), (1, 0), colspan=k, rowspan=1)
+    bar_ax.set_ylim(-5, 5)
+    bar_ax.set_xlim(-0.5, k - 0.5)
+    bars = bar_ax.bar(list(range(k)), [0] * k)
+
+    input_ax = plt.subplot2grid((grid_height, grid_width), (2, grid_height-1), colspan = 2, rowspan=2)
+    input_img = input_ax.imshow(inputs[0], cmap='gray')
+
+    scatter_ax = plt.subplot2grid((grid_height, grid_width), (2, 0), colspan=grid_height - 2, rowspan=grid_height - 2)
+
+    scatter = scatter_ax.scatter(x=outputs1[:, 0], y=outputs1[:, 1], c=labels, cmap=plt.get_cmap("tab10"))
+
+    def on_add(sel):
+        """Handles hover or click events to display the index or label of the point."""
+        # scatter_ax.set_title(f"Point index: {sel.index}, Label: {labels[sel.index]}")
+        result = outputs0[sel.index]
+        input_img.set_data(inputs[sel.index])
+        for bar, height, im in zip(bars, result, filter_im):
+            bar.set_height(height)
+            if height >= 0:
+                bar.set_color('blue')
+                im.set_cmap('gray')
+            else:
+                im.set_cmap('Reds')
+                bar.set_color('red')
+
+    # Connect to the 'add' event for hover or click (any selection)
+    mplcursors.cursor(scatter, hover=True).connect("add", on_add)
+
     plt.show()
