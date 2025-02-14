@@ -1,84 +1,71 @@
-import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import matplotlib.pyplot as plt
+import mplcursors
 import numpy as np
 from typing import List, Tuple, Dict
-import mplcursors
-from matplotlib.patches import Rectangle
 
-def scatter_animation(data: List[Tuple[str, Dict[str, List[np.ndarray]]]], save_animation_file: str = ''):
+
+def scatter_animation(data: List[Tuple[str, np.ndarray]], labels: np.ndarray):
     """
     Plots several animations of scatter plots with several colors each.
 
-    Input should be a list, where each item (name, dictionary) correspond to a different animation.
-    This dictionary is from labels to list of frames, where each frame are the 2D points needed
-    to plot at that frame, which should be in an array 2 x n.
+    'data' should be a list, where each item (name, frames) correspond to a different animation.
 
-    All animations should have the same amount of frames, and the same labels.
+    frames : num_frames x 2 x n
+    'labels' : 1 x n array with the labels for the data
 
     Change the save_animation_file parameter to save the result as a gif file save_animation_file.gif .
     """
 
     # Create the screens for the animation
     num_screens = len(data)
-    fig, axes = plt.subplots(nrows=1 ,ncols=num_screens ,figsize=( 4 *num_screens ,4))
+    fig, axes = plt.subplots(nrows=1 ,ncols=num_screens ,figsize=(4 *num_screens ,4))
     if num_screens == 1:
         axes = [axes]
 
-    all_frames = []
-    all_plots = []
-    colors = plt.get_cmap("tab10").colors
+    cmap = plt.get_cmap("tab10")
+    scatters = []
 
-    num_frames = len(list(data[0][1].values())[0]) # ?!??@?#!?@#?!@?#!@?#!!!!
+    num_frames = len(data[0][1])
     for ax, screen in zip(axes, data):
         name, pts_data = screen
 
         ax.set_title(name)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        # ax.legend()
         ax.grid(True)
 
-        # Prepare the different scatters in each screen
-        min_x = 0
-        max_x = 0
-        min_y = 0
-        max_y = 0
-        for label, frames in pts_data.items():
-            assert len(frames) == num_frames
-            all_plots.append(ax.plot([], [], 'o', color = colors[label], label=label, markersize=1.5)[0])
-            all_frames.append(frames)
-
-            # Make sure the region in each screen contains all the points in all the frames
-            cur_max_x, cur_max_y = np.array(frames).max(axis=2).max(axis=0)
-            cur_min_x, cur_min_y = np.array(frames).min(axis=2).min(axis=0)
-            max_x = max(max_x, cur_max_x)
-            max_y = max(max_y, cur_max_y)
-            min_x = min(min_x, cur_min_x)
-            min_y = min(min_y, cur_min_y)
-
+        pts_data = np.array(pts_data)
+        scatters.append(ax.scatter(
+            x = pts_data[0][0,:], y = pts_data[0][1,:],
+            cmap = cmap, c = labels, s = 10
+        ))
+        max_x, max_y = np.array(pts_data).max(axis=2).max(axis=0)
+        min_x, min_y = np.array(pts_data).min(axis=2).min(axis=0)
         ax.set_xlim(min_x *1.1, max_x *1.1)
         ax.set_ylim(min_y *1.1, max_y *1.1)
 
+    frames_per_screen = [frm for _, frm in data]
+
+
     # Initialization function: plot the background of each frame
     def init():
-        for plot in all_plots:
-            plot.set_data([], [])
-        return all_plots
+        for scatter, frames in zip(scatters, frames_per_screen):
+            scatter.set_offsets(frames[0].T)
+        return scatters
 
     # Update function: update the data for each frame
-    def update(frame):
-        for plot, frames in zip(all_plots, all_frames):
-            plot.set_data(frames[frame][0], frames[frame][1])
-        return all_plots
+    def update(frame_index):
+        for scatter, frames in zip(scatters, frames_per_screen):
+            scatter.set_offsets(frames[frame_index].T)
+        return scatters
 
     # Create the animation
-    ani = FuncAnimation(fig, update, frames=num_frames, init_func=init, blit=True)
-    fig.legend(labels=list(data[0][1].keys()), loc='upper right', title="Labels")
-    if save_animation_file != '':
-        ani.save(f"{save_animation_file}.gif", fps=10, writer="imagemagick")  # or use .mp4 for video format
+    animation = FuncAnimation(fig, update, frames=num_frames, init_func=init, blit=True)
+    fig.legend(*scatters[0].legend_elements(), loc='upper right', title="Labels")
 
     # Display the animation
     plt.show()
+
+    return animation
 
 
 def plot_filters(arr :np.ndarray):
@@ -101,6 +88,7 @@ def plot_filters(arr :np.ndarray):
         ax.imshow(img_arr, cmap='gray')
         ax.axis('off')
     plt.show()
+
 
 def plot_more_filters2(
         weights0: np.ndarray, bias0: np.ndarray,
@@ -132,11 +120,6 @@ def plot_more_filters2(
         ax.axis('off')
         ax.set_title(f'bias={bias0[i]:.3f}')
 
-    # bar_ax = plt.subplot2grid((grid_height, grid_width), (1, 0), colspan=k, rowspan=1)
-    # bar_ax.set_ylim(-5, 5)
-    # bar_ax.set_xlim(-0.5, k - 0.5)
-    # bars = bar_ax.bar(list(range(k)), [0] * k)
-
     input_ax = plt.subplot2grid((grid_height, grid_width), (2, grid_height-1), colspan = 2, rowspan=2)
     input_img = input_ax.imshow(inputs[0], cmap='gray')
 
@@ -145,19 +128,15 @@ def plot_more_filters2(
     scatter = scatter_ax.scatter(x=outputs_last[:, 0], y=outputs_last[:, 1], c=labels, cmap=plt.get_cmap("tab10"), s = 5)
 
     def on_add(sel):
-        """Handles hover or click events to display the index or label of the point."""
-        # scatter_ax.set_title(f"Point index: {sel.index}, Label: {labels[sel.index]}")
         result = outputs_first[sel.index]
         input_img.set_data(inputs[sel.index])
         for height, im in zip(result, filter_im):
             if height >= 0:
-                # bar.set_color('blue')
                 im.set_cmap('gray')
             else:
                 im.set_cmap('Reds')
-                # bar.set_color('red')
 
-    # Connect to the 'add' event for hover or click (any selection)
+    # mouse over event
     mplcursors.cursor(scatter, hover=True).connect("add", on_add)
 
     plt.show()
@@ -178,7 +157,6 @@ def plot_more_filters(
     outputs0: n x k
     outputs1: n x 2
     """
-
 
     k = weights0.shape[0]
     grid_width = max(k, 10)
@@ -206,20 +184,18 @@ def plot_more_filters(
     scatter = scatter_ax.scatter(x=outputs1[:, 0], y=outputs1[:, 1], c=labels, cmap=plt.get_cmap("tab10"))
 
     def on_add(sel):
-        """Handles hover or click events to display the index or label of the point."""
-        # scatter_ax.set_title(f"Point index: {sel.index}, Label: {labels[sel.index]}")
         result = outputs0[sel.index]
         input_img.set_data(inputs[sel.index])
         for bar, height, im in zip(bars, result, filter_im):
             bar.set_height(height)
             if height >= 0:
-                bar.set_color('blue')
                 im.set_cmap('gray')
+                bar.set_color('blue')
             else:
                 im.set_cmap('Reds')
                 bar.set_color('red')
 
-    # Connect to the 'add' event for hover or click (any selection)
+    # mouse over event
     mplcursors.cursor(scatter, hover=True).connect("add", on_add)
 
     plt.show()

@@ -1,4 +1,5 @@
-from typing import List, Iterator
+import numpy as np
+from typing import Dict, List, Iterator
 import torch
 import torch.nn as nn
 
@@ -18,10 +19,6 @@ class RotationLayer(nn.Module):
         return f'2π*{(self.theta/(2*torch.pi)):.3f}'
 
     def forward(self, x):
-        """
-        x: Tensor of shape (batch_size, 2)
-        Returns: Rotated tensor of shape (batch_size, 2)
-        """
         return torch.matmul(x, self.rotation_matrix.T)  # Apply rotation
 
 class LearnableRotationLayer(nn.Module):
@@ -54,9 +51,7 @@ class SimpleClassifier(nn.Module):
         """
         assert all(d > 0 for d in dimensions)
         super(SimpleClassifier, self).__init__()
-        self.progress_output = None
         self.flatten = nn.Flatten()
-        self.outputs = dict()
         self._linear_layers = []
 
         relu_layers = []
@@ -66,13 +61,10 @@ class SimpleClassifier(nn.Module):
             linear_layer.name = f'Linear_{linear_index}'
             linear_index += 1
             self._linear_layers.append(linear_layer)
-            # linear_layer.register_forward_hook(self.output_hook)
             relu_layers += [
                 linear_layer,
                 nn.ReLU()
             ]
-
-        # relu_layers[1] = nn.ReLU()
 
         self.linear_relu = nn.Sequential(
             *relu_layers[:-1]    # don't add ReLu before the last softmax
@@ -89,14 +81,22 @@ class SimpleClassifier(nn.Module):
     def linear_layers(self) -> Iterator[nn.Linear]:
         return iter(self._linear_layers)
 
-    def output_hook(self, module, input, output):
-        self.outputs[module.name] = output
-
     def forward(self, x):
         x = self.flatten(x)
         x = self.linear_relu(x)
         x = self.softmax(x)
         return x
 
-    def get_tracked_info(self):
-        return [self.progress_output]
+    def collect_output(self) -> Dict[torch.nn.Linear, np.ndarray]:
+        """
+        Creates an output collector for the linear layers
+        """
+        outputs = dict()
+
+        def _save_output(layer, input, output):
+            outputs[layer] = output.detach().numpy()  # batch_size x dim_output
+
+        for linear_layer in self.linear_layers():
+            linear_layer.register_forward_hook(_save_output)
+
+        return outputs

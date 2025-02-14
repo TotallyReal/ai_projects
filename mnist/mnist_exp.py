@@ -1,26 +1,24 @@
-import functools
 import copy
+from dataclasses import dataclass, field
+import functools
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+from typing import List, Tuple, Optional
 
 from misc import Timer
 
 timer = Timer()
 timer.time(print_time=False)
 
-from model_tester import test_model, train_model#, collect_train_progress
-import numpy as np
-from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Dict
 from torchvision import datasets, transforms
 import torch
 from torch.utils.data import DataLoader, Subset
-from xp_data import XpData
 
-from models import SimpleClassifier
 from mnist import visualization
-import visualization
-
-
-import os
+from model_tester import test_model, train_model
+from models import SimpleClassifier
+from xp_data import XpData
 
 
 timer.time(msg='finish imports')
@@ -79,9 +77,9 @@ params = MnistParameters(
     seed=200,
     up_to_label=2,
     learning_rate=0.001,
-    hidden=(),
-    batch_size=1024,
-    epochs=1)
+    hidden=(4),
+    batch_size=128,
+    epochs=2)
 
 # <editor-fold desc=" ------------------------ Prepare data ------------------------">
 
@@ -103,182 +101,180 @@ def plot_layer0_filters(model: SimpleClassifier):
     arr = arr.reshape(arr.shape[0], 28, 28)
     visualization.plot_filters(arr)
 
-def collect_output(model: SimpleClassifier) -> Dict[torch.nn.Linear, np.ndarray]:
-    """
-    Creates an output collector for the linear layers
-    """
-    outputs = dict()
 
-    def _save_output(model, input, output):
-        outputs[model] = output
+# <editor-fold desc=" ------------------------ Training with animation on 2D outputs ------------------------">
 
-    for linear_layer in model.linear_layers():
-        linear_layer.register_forward_hook(_save_output)
-
-    return outputs
-
-class OutputCollector:
+class OutputProgressCollector:
     """
     Train the model, and after each training batch step run it on the test data, and collect the output
     of any linear layer which has a 2-dimensional output.
 
-    Returns a dictionary progress where
-        progress[layer][label] = list[ 2 x n arrays ]
-    Where the layer is a nn.Linear and not just a number, label is the label in [0,9],
-    the list elements correspond to the learning steps, and each element is a 2 x n array with the output
-    of that step.
+    Can be used to generate an animation.
     """
 
-    def __init__(self, model: SimpleClassifier, test_loader: DataLoader, up_to_label: int):
+    def __init__(self, model: SimpleClassifier, test_input: torch.Tensor, test_output: torch.Tensor):
         self.model = model
-        self.test_loader = test_loader
-        self.up_to_label = up_to_label
+        self.test_input = test_input
+        self.test_output = test_output.detach().numpy()
 
         # Make sure the linear layers retain their output
-        self.outputs = collect_output(model)
+        self.outputs = model.collect_output()
 
         self.progress_output = dict()
         for linear_layer in model.linear_layers():
-            self.progress_output[linear_layer] = {label: [] for label in range(self.up_to_label)}
+            self.progress_output[linear_layer] = []
 
     # After each learning step, run the model on the test data and collect the output
     def progress_callback(self, epoch: int, num_data_points: int):
         self.model.eval()
         # collect linear layers output on the test dataset (one batch)
         with torch.no_grad():
-            test_data_input, test_data_output = next(iter(self.test_loader))
-            X_test = test_data_input #.to(device)
-            self.model(X_test)
+            self.model(self.test_input)
             for layer, progress in self.outputs.items():
-                for label in range(self.up_to_label):
-                    self.progress_output[layer][label].append(progress[test_data_output==label].T)
+                self.progress_output[layer].append(progress.T)
         self.model.train()
 
     def generate_animation(self, save_animation_file: str = ''):
+        # (str,  num_frames x 2 x batch_size)
         frames_data = [
-            (f'layer {i}', self.progress_output[linear_layer])
+            (f'layer {i}', np.stack(self.progress_output[linear_layer], axis=0))
             for i, linear_layer in enumerate(self.model.linear_layers())
             if linear_layer.out_features == 2
         ]
-        visualization.scatter_animation(frames_data, save_animation_file=save_animation_file)
+        animation = visualization.scatter_animation(frames_data, labels=self.test_output)
 
+        if save_animation_file != '':
+            animation.save(f"{save_animation_file}.gif", fps=10, writer="imagemagick")  # or use .mp4 for video format
 
-# <editor-fold desc=" ------------------------ Training with animation on 2D outputs ------------------------">
+run_scatter_animation = False
+if run_scatter_animation:
+    """
+    Create scatter animation of the outputs of all the linear layers going into dimension 2.
+    The frames corresponds to each learning step
+    """
 
-collector = OutputCollector(model=model, test_loader=test_loader, up_to_label=params.up_to_label)
+    with torch.no_grad():
+        for X_test, Y_test in test_loader:
+            break  # because I hate python!!!
 
-train_model(model=model, data_loader=train_loader, train_size=train_size,
-            epochs=params.epochs, learning_rate=params.learning_rate,
-            train_step_callback=collector.progress_callback)
+    #                                         n x 1 x 28 x 28               n
+    collector = OutputProgressCollector(model=model, test_input=X_test, test_output=Y_test)
 
-hidden_str = '_'.join(str(d) for d in params.hidden)
-collector.generate_animation()
-# collector.generate_animation(save_animation_file=f'media/labels_{params.up_to_label}_hidden_{hidden_str}')
+    train_model(model=model, data_loader=train_loader, train_size=train_size,
+                epochs=params.epochs, learning_rate=params.learning_rate,
+                train_step_callback=collector.progress_callback)
 
-exit(0)
+    hidden_str = '_'.join(str(d) for d in params.hidden)
+    collector.generate_animation()  # save_animation_file=f'media/labels_{params.up_to_label}_hidden_{hidden_str}')
+
 
 # </editor-fold>
 
 # <editor-fold desc=" ------------------------ Plot filters from first layer ------------------------">
 #
-# def plot_first_layer_images(epoch: int, num_data_points: int):
-#     if num_data_points>0:
-#         return
-#     weights = model.get_linear_layer(1).weight.detach().cpu().numpy()
-#     arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
-#     arr = arr.reshape(arr.shape[0], 28, 28)
-#     # plot_filters(arr)
-#
-#     fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(5 * 2, 2 * 2))
-#     fig.suptitle(f'Epoch {epoch}')
-#     axes = axes.flatten()
-#
-#     for i, ax in enumerate(axes):
-#         ax.imshow(arr[i], cmap='gray')
-#         ax.set_title(f"{weights[0][i]:.3f} ; {weights[1][i]:.3f}", fontsize=12)
-#         ax.axis('off')
-#     save_path = f'media/filters/seed{params.seed}/filters_{epoch}'
-#     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-#     plt.savefig(save_path, dpi=300, bbox_inches='tight')
-#     plt.close()
-#
-# train_model(model=model, data_loader=train_loader, train_size=train_size,
-#             epochs=params.epochs, learning_rate=params.learning_rate,
-#             train_step_callback=plot_first_layer_images)
+def plot_first_layer_images(title:str, save_path: str = ''):
+    """
+    Plots the filters of the first layer after each epoch and save them as images.
+    Change 'save_path' to a file path in order to save the output (instead of showing it in plt).
+    """
+    special_case = False
+    if model.number_of_linear_layers() == 2:
+        weights = model.get_linear_layer(1).weight.detach().cpu().numpy()
+        special_case = (weights.shape[0] == 2)
+    arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
+    arr = arr.reshape(arr.shape[0], 28, 28)
+    bias = model.get_linear_layer(0).bias.detach().cpu().numpy()
+    # plot_filters(arr)
+
+    fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(5 * 2, 2 * 2 + 1))
+    fig.suptitle(title)
+    axes = axes.flatten()
+
+    for ax in axes:
+        ax.axis('off')
+
+    if special_case:
+        for ax, img_arr, b, w in zip(axes, arr, bias, weights.T):
+            ax.imshow(img_arr, cmap='gray')
+            ax.set_title(f'{w[0]:.3f} ; {w[1]:.3f}\nBias={b:.3f}', fontsize=12)
+    else:
+        for i, (ax, img_arr, b) in enumerate(zip(axes, arr, bias)):
+            ax.imshow(img_arr, cmap='gray')
+            if special_case:
+                ax.set_title(f'{weights[0][i]:.3f} ; {weights[1][i]:.3f}\nBias={b:.3f}', fontsize=12)
+            else:
+                ax.set_title(f'Bias={b}', fontsize=12)
+    if save_path != '':
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
+def callback_to_filters(epoch: int, num_data_points: int):
+    if num_data_points>0:     # only run when each epoch is finished
+        return
+    plot_first_layer_images(f'Epoch {epoch}') #, save_path = f'media/filters/seed{params.seed}/filters_{epoch}')
+
+run_filter_plots = False
+if run_filter_plots:
+    train_model(model=model, data_loader=train_loader, train_size=train_size,
+                epochs=params.epochs, learning_rate=params.learning_rate,
+                train_step_callback=callback_to_filters)
+
 
 # </editor-fold>
 
-# <editor-fold desc=" ------------------------ Description ------------------------">
+# <editor-fold desc=" ------------------------ Everything together ------------------------">
 
 
-train_loader = DataLoader(Subset(train_data, range(10))  , batch_size=1, shuffle=True)
+# train_loader = DataLoader(Subset(train_data, range(10))  , batch_size=1, shuffle=True)
 
-# for layer in model.linear_layers():
-#     layer.weight.requires_grad = False
-#     layer.bias.requires_grad = False
-
-#
 train_model(model=model, data_loader=train_loader, train_size=train_size,
             epochs=params.epochs, learning_rate=params.learning_rate)
-#
 
-# arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
-# arr = arr.reshape(arr.shape[0], 28, 28)
-# plot_filters(arr)
-#
-# exit(0)
+run_analyze_outputs = False
+if run_analyze_outputs:
 
-weights0 = model.get_linear_layer(0).weight.detach().cpu().numpy()
-bias0 = model.get_linear_layer(0).bias.detach().cpu().numpy()
-weights0 = weights0.reshape(weights0.shape[0], 28, 28)
+    weights0 = model.get_linear_layer(0).weight.detach().cpu().numpy()
+    bias0 = model.get_linear_layer(0).bias.detach().cpu().numpy()
+    weights0 = weights0.reshape(weights0.shape[0], 28, 28)
 
-linear_outputs = collect_output(model) # add hooks to collect output of linear layers
-model.eval()
-with torch.no_grad():
-    for X_test, Y_test in test_loader:
-        model_output = model(X_test)
-        break  # because I hate python!!!
+    linear_outputs = model.collect_output() # add hooks to collect output of linear layers
+    model.eval()
+    with torch.no_grad():
+        for X_test, Y_test in test_loader:
+            model_output = model(X_test)
+            break  # because I hate python!!!
 
-print('Train data:')
-train_error_rate = test_model(model, train_loader)
-print('Test data:')
-test_error_rate = test_model(model, test_loader)
+    print('Train data:')
+    train_error_rate = test_model(model, train_loader)
+    print('Test data:')
+    test_error_rate = test_model(model, test_loader)
 
-hidden_length = len(params.hidden)
+    hidden_length = len(params.hidden)
 
-if hidden_length == 1:
-    weights1 = model.get_linear_layer(1).weight.detach().cpu().numpy()
-    visualization.plot_more_filters(
-        weights0=weights0, bias0=bias0, weights1=weights1,
-        inputs=X_test.numpy().squeeze(1), labels=Y_test,
-        outputs0=linear_outputs[model.get_linear_layer(0)],
-        outputs1=linear_outputs[model.get_linear_layer(1)],
-        )
-else:
-    outputs_last = linear_outputs[model.get_linear_layer(hidden_length)]
-    visualization.plot_more_filters2(
-        weights0=weights0, bias0=bias0,
-        inputs=X_test.numpy().squeeze(1), labels=Y_test,
-        outputs_first=linear_outputs[model.get_linear_layer(0)],
-        outputs_last=outputs_last,
-        )
+    if hidden_length == 1:
+        weights1 = model.get_linear_layer(1).weight.detach().cpu().numpy()
+        visualization.plot_more_filters(
+            weights0=weights0, bias0=bias0, weights1=weights1,
+            inputs=X_test.numpy().squeeze(1), labels=Y_test,
+            outputs0=linear_outputs[model.get_linear_layer(0)],
+            outputs1=linear_outputs[model.get_linear_layer(1)],
+            )
+    else:
+        outputs_last = linear_outputs[model.get_linear_layer(hidden_length)]
+        visualization.plot_more_filters2(
+            weights0=weights0, bias0=bias0,
+            inputs=X_test.numpy().squeeze(1), labels=Y_test,
+            outputs_first=linear_outputs[model.get_linear_layer(0)],
+            outputs_last=outputs_last,
+            )
 
 
 
-exit(0)
 
 # </editor-fold>
-
-# <editor-fold desc=" ------------------------ Compute error rates ------------------------">
-
-print('Train data:')
-train_error_rate = test_model(model, train_loader)
-print('Test data:')
-test_error_rate = test_model(model, test_loader)
-
-# </editor-fold>
-
-exit(0)
 
 def run_hyper_parameters(
         params: MnistParameters,
@@ -315,53 +311,56 @@ def run_hyper_parameters(
 
                 yield model, params, train_loader
 
-running_data = XpData(
-    file_path=f'running_data{params.up_to_label}.csv',
-    data_cls=MnistParameters,
-    values = dict(train_error_rate=float, test_error_rate=float))
-saved_size = len(running_data)
+run_save_errors = False
 
+if run_save_errors:
 
-initial_params = MnistParameters(
-    seed=1,
-    up_to_label=2,
-    learning_rate=1,
-    hidden=(),
-    batch_size=1,
-    epochs=1)
+    running_data = XpData(
+        file_path=f'running_data{params.up_to_label}.csv',
+        data_cls=MnistParameters,
+        values = dict(train_error_rate=float, test_error_rate=float))
+    saved_size = len(running_data)
 
-save_data = True
+    initial_params = MnistParameters(
+        seed=1,
+        up_to_label=2,
+        learning_rate=1,
+        hidden=(),
+        batch_size=1,
+        epochs=1)
 
-# To run over different epochs, use the callback
-for model, params, train_loader in run_hyper_parameters(
-        params = initial_params,
-        hidden_layers_param = [(), (2,)],
-        batch_sizes = [64, 128],
-        learning_rates = [0.001]
-    ):
+    save_data = True
 
-    print('----------------------------------------------------')
-    if running_data.contains_index(params):
-        print(f'Skipping {params}')
-        continue
-    print(f'Running for parameters {params=}')
+    # To run over different epochs, use the callback
+    for model, params, train_loader in run_hyper_parameters(
+            params = initial_params,
+            hidden_layers_param = [(), (2,)],
+            batch_sizes = [64, 128],
+            learning_rates = [0.001]
+        ):
 
-    train_model(
-        model=model, data_loader=train_loader, train_size=train_size,
-        epochs=params.epochs, learning_rate=params.learning_rate)
+        print('----------------------------------------------------')
+        if running_data.contains_index(params):
+            print(f'Skipping {params}')
+            continue
+        print(f'Running for parameters {params=}')
 
-    print('Train data:')
-    train_error_rate = test_model(model, train_loader)
-    print('Test data:')
-    test_error_rate = test_model(model, test_loader)
+        train_model(
+            model=model, data_loader=train_loader, train_size=train_size,
+            epochs=params.epochs, learning_rate=params.learning_rate)
 
-    running_data.add_entry(
-        params,
-        train_error_rate=train_error_rate, test_error_rate=test_error_rate)
-    if save_data and len(running_data) >= saved_size + 20:
+        print('Train data:')
+        train_error_rate = test_model(model, train_loader)
+        print('Test data:')
+        test_error_rate = test_model(model, test_loader)
+
+        running_data.add_entry(
+            params,
+            train_error_rate=train_error_rate, test_error_rate=test_error_rate)
+        if save_data and len(running_data) >= saved_size + 20:
+            running_data.save()
+
+    if save_data:
         running_data.save()
-
-if save_data:
-    running_data.save()
 
 
