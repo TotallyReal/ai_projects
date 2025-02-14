@@ -16,10 +16,23 @@ In the case where we have a single linear layer, so there are 10 outputs, and ea
 to a different layer, we get the following image:
 <p align="center"><img src="media/mnist_filters.png" width="600"/></p>
 
-<video width="640" height="360" controls>
-  <source src="media/mid_layer.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+
+Once having more hidden layer, analysing the system becomes a bit harder...
+
+Below is a short video of classifying 0/1 bit with $28^2 \to 10 \to 2$ model.
+
+- In the top row we have the filter for each one of the 10 output of the first layer.
+- While 10 node in a hidden layer make the system "more complicated" we still see that they all learn more or less the same 2 filters.
+- As the filter are the weights of the linear part, above them in the title we have the bias.
+- In addition, the second (and final) linear layer sends the output of each node in the hidden layer to the two classifying nodes of 0 and 1. The weights
+  on these connections also appear in the title. Note that we can expect filter that look like 1 to have weights (low : high) and filter which look like zero to be (high : low).
+- Since we classify 0/1, the output of the model is in 2D which we can plot (at the bottom left). This is done for any picture in the test data.
+- Given such test point, applying the first layer gives the values for the middle hidden layer, which appear in the bar graph.
+- Note that if the value there is negative (red), then the ReLu zeros it. This is why one of the filters looks like random noise - it is negative for all the test (and train) data, so it never really improved during the train process.
+
+https://github.com/user-attachments/assets/f7af6583-a2e6-469c-8674-d4e1fa8033d0
+
+
 
 ## 2D separation
 
