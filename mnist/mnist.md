@@ -16,6 +16,11 @@ In the case where we have a single linear layer, so there are 10 outputs, and ea
 to a different layer, we get the following image:
 <p align="center"><img src="media/mnist_filters.png" width="600"/></p>
 
+<video width="640" height="360" controls>
+  <source src="media/mid_layer.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 ## 2D separation
 
 If a linear layer ends in dimension $2$, then we can easily plot its output in the plane
@@ -30,12 +35,12 @@ and one epoch unless stated otherwise.
 In this case, the final output is always 2D, which we can view, but we can also view
 any mid layer which has output 2.
 
-1. A single layer $ (28 \times 28) \to 2$:
+1. A single layer $(28 \times 28) \to 2$:
    Note that not only the colors are getting more separated as the learning progress, but
    the separation is with a line at the direction $x=y$, which is what SoftMax needs. The test
    error data at the end was around $0.0015$.
    <p align="center"><img src="media/labels_2_hidden_0.gif" width="400"/></p>
-2. Two linear layers: $ (28\times 28)\to 2\to 2$ :
+2. Two linear layers: $(28\times 28)\to 2\to 2$ :
    - Note how most of the blue points after layer 0 have negative $x$-value. This means that
    when ReLu is applied to them, they collapse into a line, which can be seen in layer 1.
    - Here too, we can separate the point with a line at the direction $x=y$. The test
@@ -44,12 +49,12 @@ any mid layer which has output 2.
      become separated after the first layer 
    <p align="center"><img src="media/labels_2_hidden_2.gif" width="600"/></p>
 
-3. Four linear layers: $ (28\times 28)\to 2\to 2\to 2\to 2$ :
+3. Four linear layers: $(28\times 28)\to 2\to 2\to 2\to 2$ :
    - Applying ReLu layers, while break linearity, it also "collapses" $\frac{3}{4}$ of the information,
    namely points where $x\leq 0$ or $y\leq 0$. This is why it is not surprising that after 4 layers
    all the points are on the same line. We still have good separation with final error rate $\sim 0.002$.
    <p align="center"><img src="media/labels_2_hidden_2_2_2.gif" width="800"/></p>
-4. Five linear layers: $ (28\times 28)\to 2\to 2\to 2\to 2\to 2$ :
+4. Five linear layers: $(28\times 28)\to 2\to 2\to 2\to 2\to 2$ :
    - Too many ReLu layers collapse all the information to a single point at initialization, so almost
    no learning is possible (error rate was about $~0.45$).
    - Can a good choice of initialization solve this problem, maybe add offsets that make sure that
@@ -58,7 +63,7 @@ any mid layer which has output 2.
 
 ### Classifying more labels
 
-Here I used network with dimension $(28\times 28)\to 2 \to \text{num_labels}$.
+Here I used network with dimension $(28\times 28)\to 2 \to \text{num-labels}$.
 
 1. Classify 0\1\2: With a single epoch:
    - Test error rate $\sim \frac{1}{3}$ which is way better than the $\frac{2}{3}$ for random guesses.
