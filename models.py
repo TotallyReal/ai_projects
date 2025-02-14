@@ -1,5 +1,41 @@
-from typing import List, Iterator
+import numpy as np
+from typing import Dict, List, Iterator
+import torch
 import torch.nn as nn
+
+class RotationLayer(nn.Module):
+    def __init__(self, theta: float):
+        super().__init__()
+        self.theta = torch.tensor(theta, dtype=torch.float32)  # Store as tensor
+        self.register_buffer("rotation_matrix", self._get_rotation_matrix(self.theta))
+
+    def _get_rotation_matrix(self, theta: torch.Tensor):
+        """Create a 2x2 rotation matrix for the given angle (in degrees)."""
+        return torch.tensor([
+            [torch.cos(theta), -torch.sin(theta)],
+            [torch.sin(theta), torch.cos(theta)]], dtype=torch.float32)
+
+    def theta_str(self):
+        return f'2π*{(self.theta/(2*torch.pi)):.3f}'
+
+    def forward(self, x):
+        return torch.matmul(x, self.rotation_matrix.T)  # Apply rotation
+
+class LearnableRotationLayer(nn.Module):
+    def __init__(self, theta: float):
+        super().__init__()
+        self.theta = nn.Parameter(torch.tensor(theta, dtype=torch.float32))  # Learnable angle in radians
+
+    def theta_str(self):
+        return f'2π*{(self.theta/(2*torch.pi)):.3f}'
+
+    def forward(self, x):
+        theta = self.theta  # Keep theta in radians
+        rotation_matrix = torch.stack([
+            torch.cos(theta), -torch.sin(theta),
+            torch.sin(theta), torch.cos(theta)
+        ]).reshape(2, 2)
+        return torch.matmul(x, rotation_matrix.T)
 
 class SimpleClassifier(nn.Module):
     """
@@ -15,10 +51,9 @@ class SimpleClassifier(nn.Module):
         """
         assert all(d > 0 for d in dimensions)
         super(SimpleClassifier, self).__init__()
-        self.progress_output = None
         self.flatten = nn.Flatten()
-        self.outputs = dict()
         self._linear_layers = []
+
         relu_layers = []
         linear_index = 0
         for input_size, output_size in zip(dimensions[:-1], dimensions[1:]):
@@ -26,13 +61,10 @@ class SimpleClassifier(nn.Module):
             linear_layer.name = f'Linear_{linear_index}'
             linear_index += 1
             self._linear_layers.append(linear_layer)
-            # linear_layer.register_forward_hook(self.output_hook)
             relu_layers += [
                 linear_layer,
                 nn.ReLU()
             ]
-
-        # relu_layers[1] = nn.ReLU()
 
         self.linear_relu = nn.Sequential(
             *relu_layers[:-1]    # don't add ReLu before the last softmax
@@ -49,14 +81,22 @@ class SimpleClassifier(nn.Module):
     def linear_layers(self) -> Iterator[nn.Linear]:
         return iter(self._linear_layers)
 
-    def output_hook(self, module, input, output):
-        self.outputs[module.name] = output
-
     def forward(self, x):
         x = self.flatten(x)
         x = self.linear_relu(x)
         x = self.softmax(x)
         return x
 
-    def get_tracked_info(self):
-        return [self.progress_output]
+    def collect_output(self) -> Dict[torch.nn.Linear, np.ndarray]:
+        """
+        Creates an output collector for the linear layers
+        """
+        outputs = dict()
+
+        def _save_output(layer, input, output):
+            outputs[layer] = output.detach().numpy()  # batch_size x dim_output
+
+        for linear_layer in self.linear_layers():
+            linear_layer.register_forward_hook(_save_output)
+
+        return outputs
