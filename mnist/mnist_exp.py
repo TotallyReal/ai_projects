@@ -26,15 +26,25 @@ timer.time(msg='finish imports')
 
 class MnistData:
 
-    def __init__(self):
+    def __init__(self, data_root_dir: str = ''):
+        """
+        Leave the data_root_dir empty to load the data (if needed) into the directory
+        of this file.
+        Otherwise, it loads into data_root_dir.
+        For example, you can use data_root_dir = './data' to load it into the subdirectory
+        data inside the directory of the file from which the script is running.
+        """
         transform = transforms.Compose([
             transforms.Grayscale(num_output_channels=1),  # Ensure single channel
             transforms.ToTensor()  # Convert to tensor and normalize to [0, 1]
         ])
 
         # Load MNIST dataset
-        self.train_dataset = datasets.MNIST(root="./data", train=True,  transform=transform, download=True)
-        self.test_dataset  = datasets.MNIST(root="./data", train=False, transform=transform, download=True)
+        if data_root_dir == '':
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            root_dir = os.path.join(script_dir, "data")
+        self.train_dataset = datasets.MNIST(root=root_dir, train=True,  transform=transform, download=True)
+        self.test_dataset  = datasets.MNIST(root=root_dir, train=False, transform=transform, download=True)
 
     @functools.lru_cache
     def restricted_data(self, up_to_label: int) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
@@ -228,13 +238,13 @@ if run_filter_plots:
 # <editor-fold desc=" ------------------------ Everything together ------------------------">
 
 
-# train_loader = DataLoader(Subset(train_data, range(10))  , batch_size=1, shuffle=True)
-
-train_model(model=model, data_loader=train_loader, train_size=train_size,
-            epochs=params.epochs, learning_rate=params.learning_rate)
-
 run_analyze_outputs = False
 if run_analyze_outputs:
+
+    # train_loader = DataLoader(Subset(train_data, range(10))  , batch_size=1, shuffle=True)
+
+    train_model(model=model, data_loader=train_loader, train_size=train_size,
+                epochs=params.epochs, learning_rate=params.learning_rate)
 
     weights0 = model.get_linear_layer(0).weight.detach().cpu().numpy()
     bias0 = model.get_linear_layer(0).bias.detach().cpu().numpy()
@@ -270,8 +280,6 @@ if run_analyze_outputs:
             outputs_first=linear_outputs[model.get_linear_layer(0)],
             outputs_last=outputs_last,
             )
-
-
 
 
 # </editor-fold>
