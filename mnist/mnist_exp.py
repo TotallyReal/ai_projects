@@ -1,10 +1,8 @@
-import copy
 from dataclasses import dataclass, field
-import functools
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Iterator, Callable, TypeVar
 
 from misc import Timer
 
@@ -13,18 +11,20 @@ timer.time(print_time=False)
 
 from torchvision import datasets, transforms
 import torch
-from torch.utils.data import DataLoader, Subset
 
 from mnist import visualization
-from model_tester import test_model, train_model
-from models import SimpleClassifier
-from xp_data import XpData
+from general.model_tester import test_model, train_model, TrainingParameters
+from general.models import SimpleClassifier, ModelParameters
+from general.xp_data import XpData
+
+from general.image_data import ImageData, ImageDataParameters
+from general import analyse_data, image_data
 
 
 timer.time(msg='finish imports')
 
 
-class MnistData:
+class MnistData(ImageData):
 
     def __init__(self, data_root_dir: str = ''):
         """
@@ -43,27 +43,16 @@ class MnistData:
         if data_root_dir == '':
             script_dir = os.path.dirname(os.path.abspath(__file__))
             root_dir = os.path.join(script_dir, "data")
-        self.train_dataset = datasets.MNIST(root=root_dir, train=True,  transform=transform, download=True)
-        self.test_dataset  = datasets.MNIST(root=root_dir, train=False, transform=transform, download=True)
 
-    @functools.lru_cache
-    def restricted_data(self, up_to_label: int) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
-        res_train_dataset = Subset(
-            self.train_dataset, [i for i, label in enumerate(self.train_dataset.targets) if label<up_to_label])
-        res_test_dataset = Subset(
-            self.test_dataset, [i for i, label in enumerate(self.test_dataset.targets) if label<up_to_label])
-        return res_train_dataset, res_test_dataset
+        train_dataset = datasets.MNIST(root=root_dir, train=True,  transform=transform, download=True)
+        test_dataset  = datasets.MNIST(root=root_dir, train=False, transform=transform, download=True)
 
-    @functools.lru_cache
-    def train_loader(self, up_to_label:int, batch_size: int) -> DataLoader:
-        train_dataset, _ = self.restricted_data(up_to_label)
-        return DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+        super().__init__(
+            train_dataset=train_dataset,        # size = 60000
+            test_dataset=test_dataset,          # size = 10000
+            label_names=train_dataset.classes   # = ['????']
+        )
 
-    @functools.lru_cache
-    def test_loader(self, up_to_label:int, batch_size: int = -1) -> DataLoader:
-        _, test_dataset = self.restricted_data(up_to_label)
-        batch_size = batch_size if batch_size > 0 else len(test_dataset)
-        return DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
 @dataclass
 class MnistParameters:
@@ -83,22 +72,34 @@ class MnistParameters:
         assert self.batch_size > 0
         assert self.epochs > 0
 
+    def update_model(self, model_params: ModelParameters):
+        self.seed = model_params.seed
+        self.hidden = model_params.hidden[1:-1]
+
+    def update_image_data(self, data_parameters: ImageDataParameters):
+        self.batch_size = data_parameters.batch_size
+        self.up_to_label = data_parameters.up_to_label
+
+    def update_training(self, training_parameters: TrainingParameters):
+        self.learning_rate = training_parameters.learning_rate
+        self.epochs = training_parameters.epochs
+
 params = MnistParameters(
-    seed=200,
-    up_to_label=2,
-    learning_rate=0.001,
-    hidden=(4),
-    batch_size=128,
-    epochs=2)
+    seed=1,                     # model
+    up_to_label=2,             # data
+    learning_rate=0.001,        # training
+    hidden=(),                  # model
+    batch_size=128,             # data
+    epochs=2)                   # training
 
 # <editor-fold desc=" ------------------------ Prepare data ------------------------">
 
-mnist_data = MnistData()
+database = MnistData()
 
-train_data, test_data = mnist_data.restricted_data(up_to_label=params.up_to_label)
+train_data, test_data = database.restricted_data(up_to_label=params.up_to_label)
 train_size = len(train_data)
-train_loader = mnist_data.train_loader(up_to_label=params.up_to_label, batch_size=params.batch_size)
-test_loader = mnist_data.test_loader(up_to_label=params.up_to_label)
+train_loader = database.train_loader(up_to_label=params.up_to_label, batch_size=params.batch_size)
+test_loader = database.test_loader(up_to_label=params.up_to_label)
 
 # Prepare model
 torch.manual_seed(params.seed)
@@ -109,7 +110,7 @@ model = SimpleClassifier(dimensions=[28 * 28] + list(params.hidden) + [params.up
 def plot_layer0_filters(model: SimpleClassifier):
     arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
     arr = arr.reshape(arr.shape[0], 28, 28)
-    visualization.plot_filters(arr)
+    visualization.plot_images(arr)
 
 
 # <editor-fold desc=" ------------------------ Training with animation on 2D outputs ------------------------">
@@ -182,9 +183,9 @@ if run_scatter_animation:
 
 # <editor-fold desc=" ------------------------ Plot filters from first layer ------------------------">
 #
-def plot_first_layer_images(title:str, save_path: str = ''):
+def plot_first_layer_images(model: SimpleClassifier, title:str, save_path: str = ''):
     """
-    Plots the filters of the first layer after each epoch and save them as images.
+    Plots the filters of the first layer after each epoch and show them
     Change 'save_path' to a file path in order to save the output (instead of showing it in plt).
     """
     special_case = False
@@ -222,7 +223,7 @@ def plot_first_layer_images(title:str, save_path: str = ''):
         plt.show()
 
 def callback_to_filters(epoch: int, num_data_points: int):
-    if num_data_points>0:     # only run when each epoch is finished
+    if num_data_points>=0:     # only run when each epoch is finished
         return
     plot_first_layer_images(f'Epoch {epoch}') #, save_path = f'media/filters/seed{params.seed}/filters_{epoch}')
 
@@ -284,91 +285,53 @@ if run_analyze_outputs:
 
 # </editor-fold>
 
-def run_hyper_parameters(
-        params: MnistParameters,
-        hidden_layers_param: Optional[List[Tuple[int]]] = None ,
-        batch_sizes: Optional[List[int]] = None,
-        learning_rates : Optional[List[float]] = None):
 
-    if hidden_layers_param is None:
-        hidden_layers_param = [params.hidden]
-    if batch_sizes is None:
-        batch_sizes = [params.batch_size]
-    if learning_rates is None:
-        learning_rates = [params.learning_rate]
+T = TypeVar('T')
+IteratorFactory = Callable[[],Iterator[T]]
 
-    params = copy.deepcopy(params)
+run_save_errors = True
 
-    for hidden_layers in hidden_layers_param:
-        params.hidden = hidden_layers
+up_to_label = 2
+running_data = XpData(
+    file_path=f'mnist_data{up_to_label}.csv',
+    data_cls=analyse_data.Parameters,
+    values = dict(train_error_rate=float, test_error_rate=float))
 
-        # Create model
-        torch.manual_seed(params.seed)
-        model = SimpleClassifier([28 * 28] + list(params.hidden) + [params.up_to_label])
-        initial_state = model.state_dict()
+# database.plot_examples()
+
+# analyse_data.save_errors(
+#     running_data=running_data, test_loader=test_loader,
+#     model_generator = lambda: SimpleClassifier.generate_from_parameters(
+#         seeds                   =[1, 10, 100, 1000],
+#         linear_layer_dimensions =[(28*28,)+hidden+(up_to_label,) for hidden in [()]]),
+#     data_generator = lambda: database.train_loaders_from_parameters(
+#         up_to_label             =[up_to_label],
+#         batch_sizes             =[64]
+#     ),
+#     training_generator = lambda: TrainingParameters.from_parameters(
+#         learning_rates          =[0.001],
+#         epoch_list              =[5])
+# )
+
+# analyse_data.errors_per_epoch(
+#     running_data,
+#     # seed = 100,
+#     learning_rate=0.001,
+#     hidden=(),
+#     batch_size=64
+# )
 
 
-        for batch_size in batch_sizes:
-            params.batch_size = batch_size
-            train_loader = mnist_data.train_loader(up_to_label=params.up_to_label, batch_size=params.batch_size)
+# for X_test, Y_test in test_loader:
+#     break  # because I hate python!!!
+# Y_test = Y_test.detach().numpy()
+# X_test = X_test.detach().numpy()
+# X_test = X_test.reshape(X_test.shape[0], -1)
 
-            for learning_rate in learning_rates:
-                params.learning_rate = learning_rate
+# arr = np.squeeze(X_test[Y_test == 0])
 
-                model.load_state_dict(initial_state)
-
-                yield model, params, train_loader
-
-run_save_errors = False
-
-if run_save_errors:
-
-    running_data = XpData(
-        file_path=f'running_data{params.up_to_label}.csv',
-        data_cls=MnistParameters,
-        values = dict(train_error_rate=float, test_error_rate=float))
-    saved_size = len(running_data)
-
-    initial_params = MnistParameters(
-        seed=1,
-        up_to_label=2,
-        learning_rate=1,
-        hidden=(),
-        batch_size=1,
-        epochs=1)
-
-    save_data = True
-
-    # To run over different epochs, use the callback
-    for model, params, train_loader in run_hyper_parameters(
-            params = initial_params,
-            hidden_layers_param = [(), (2,)],
-            batch_sizes = [64, 128],
-            learning_rates = [0.001]
-        ):
-
-        print('----------------------------------------------------')
-        if running_data.contains_index(params):
-            print(f'Skipping {params}')
-            continue
-        print(f'Running for parameters {params=}')
-
-        train_model(
-            model=model, data_loader=train_loader, train_size=train_size,
-            epochs=params.epochs, learning_rate=params.learning_rate)
-
-        print('Train data:')
-        train_error_rate = test_model(model, train_loader)
-        print('Test data:')
-        test_error_rate = test_model(model, test_loader)
-
-        running_data.add_entry(
-            params,
-            train_error_rate=train_error_rate, test_error_rate=test_error_rate)
-        if save_data and len(running_data) >= saved_size + 20:
-            running_data.save()
-
-    if save_data:
-        running_data.save()
-
+# visualization.plot_images(
+#     arr = arr[:20],
+# )
+# visualization.pca_visualize(arr, 10)
 
