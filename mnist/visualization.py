@@ -2,7 +2,7 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 
 def scatter_animation(data: List[Tuple[str, np.ndarray]], labels: np.ndarray):
@@ -68,25 +68,29 @@ def scatter_animation(data: List[Tuple[str, np.ndarray]], labels: np.ndarray):
     return animation
 
 
-def plot_filters(arr :np.ndarray):
+def plot_filters(arr :np.ndarray, labels = Optional[List[str]]):
     """
     Plots up to 10 images in a grid.
     Input should be of shape k x n x n
     """
     k = len(arr)
 
+    if labels is None:
+        labels = [''] * k
+
     n_cols = 5
     for i in range(5):
-        if k % i+1 == 0:
+        if k % (i+1) == 0:
             n_cols = i+1
-    n_rows = np.ceil(k/n_cols)
+    n_rows = int(np.ceil(k/n_cols))
 
     fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(n_cols * 2, n_rows * 2))
     axes = axes.flatten()
 
-    for img_arr, ax in zip(arr, axes):
+    for img_arr, ax, title in zip(arr, axes, labels):
         ax.imshow(img_arr, cmap='gray')
         ax.axis('off')
+        ax.set_title(title)
     plt.show()
 
 

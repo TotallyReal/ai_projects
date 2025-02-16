@@ -8,7 +8,7 @@ from dataclasses import dataclass, is_dataclass, fields, asdict
 
 class XpData:
 
-    def __init__(self, file_path: str, data_cls: Type, values: Dict[str, Type]):
+    def __init__(self, file_path: str, data_cls: Type, values: Dict[str, Type], auto_save: int = -1):
         if not is_dataclass(data_cls):
             raise TypeError(f"{data_cls} needs to be a dataclass")
         self._index_type = data_cls
@@ -17,10 +17,12 @@ class XpData:
         self._values_cols = list(values.keys())
         self.reload()
 
+        self.saved_size = len(self.df)
+        self.auto_save = auto_save
 
 
-    def __len__(selfi):
-        return len(selfi.df)
+    def __len__(self):
+        return len(self.df)
 
     def reload(self):
         if os.path.exists(self._file_path):
@@ -61,7 +63,13 @@ class XpData:
     def add_entry(self, index_data, **entry_values):
         assert isinstance(index_data, self._index_type)
         row = {**asdict(index_data), **entry_values}
-        self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
+        if self.df.empty:
+            self.df = pd.DataFrame([row])
+        else:
+            self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
+
+        if self.auto_save > 0 and len(self) >= self.saved_size + self.auto_save:
+            self.save()
 
     # def add_new_column(self, col_name:str, default_value, in_index:bool):
     #     self.df[col_name] = [default_value] * len(self.df)

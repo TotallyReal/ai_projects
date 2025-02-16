@@ -1,5 +1,6 @@
+from dataclasses import dataclass, field
 import numpy as np
-from typing import Dict, List, Iterator
+from typing import Dict, List, Iterator, Tuple, Optional
 import torch
 import torch.nn as nn
 
@@ -37,11 +38,30 @@ class LearnableRotationLayer(nn.Module):
         ]).reshape(2, 2)
         return torch.matmul(x, rotation_matrix.T)
 
+@dataclass
+class ModelParameters:
+    seed: int
+    hidden: Tuple[int, ...] = field(default_factory=tuple)
+
+    def __post_init__(self):
+        if isinstance(self.hidden, int):
+            self.hidden = (self.hidden,)
+        assert all([d>0 for d in self.hidden])
+
 class SimpleClassifier(nn.Module):
     """
     A simple module containing linear layers seperated by ReLu nonlinear layers, with final Softmax:
     Linear -> ReLu -> Linear -> ReLu -> ... -> Linear -> SoftMax
     """
+
+    @classmethod
+    def generate_from_parameters(cls, seeds: List[int], linear_layer_dimensions: List[Tuple[int,...]]) \
+            -> Iterator[Tuple[nn.Module, ModelParameters]]:
+        for seed in seeds:
+            for dimensions in linear_layer_dimensions:
+                torch.manual_seed(seed)
+                model = SimpleClassifier(list(dimensions))
+                yield model, ModelParameters(seed=seed, hidden=dimensions)
 
     def __init__(self, dimensions: List[int]):
         """
@@ -71,6 +91,11 @@ class SimpleClassifier(nn.Module):
         )
 
         self.softmax = nn.Softmax(dim=1)
+
+        self.initial_state = self.state_dict()
+
+    def initialize_state(self):
+        self.load_state_dict(self.initial_state)
 
     def get_linear_layer(self, k: int = 0) -> nn.Linear:
         return self._linear_layers[k]

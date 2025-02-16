@@ -1,8 +1,9 @@
+from dataclasses import dataclass
 from torch.utils.data import DataLoader
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from typing import Callable
+from typing import Callable, List, Iterator
 
 from misc import print_progress_bar
 from misc import time_me
@@ -12,11 +13,30 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def empty_callback(epoch: int, num_data_points: int):
     pass
 
+@dataclass
+class TrainingParameters:
+    learning_rate: float = 0.001
+    epochs: int = 1
+
+    def __post_init__(self):
+        assert self.learning_rate > 0
+        assert self.epochs > 0
+
+    @staticmethod
+    def from_parameters(learning_rates: List[float], epoch_list: List[int]) -> Iterator['TrainingParameters']:
+        for learning_rate in learning_rates:
+            for epoch in epoch_list:
+                yield TrainingParameters(learning_rate=learning_rate, epochs=epoch)
+
+default_training_parameters = TrainingParameters(
+    epochs = 10,
+    learning_rate = 0.001
+)
 
 @time_me
 def train_model(
         model: nn.Module, data_loader: DataLoader, train_size: int = 0,
-        epochs:int = 10, learning_rate: float = 0.001,
+        parameters: TrainingParameters = default_training_parameters,
         train_step_callback: Callable[[int, int],None] = empty_callback):
     """
     Runs the model on the given data, with the given epochs and learning rate.
@@ -29,11 +49,11 @@ def train_model(
     model = model.to(device)
 
     loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=parameters.learning_rate)
 
     model.train()
 
-    for epoch in range(epochs):
+    for epoch in range(parameters.epochs):
         data_so_far = 0
         if train_size>0:
             print_progress_bar(iteration=data_so_far, total=train_size)
@@ -57,7 +77,7 @@ def train_model(
                 print_progress_bar(iteration=data_so_far, total=train_size)
         train_step_callback(epoch, -1)
 
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}")
+        print(f"Epoch [{epoch+1}/{parameters.epochs}], Loss: {loss.item():.4f}")
 
 
 
