@@ -12,8 +12,15 @@ blue line, we will lose information but not too much. The main problem of course
 and measure how much information we lost.
 <p align="center"><img src="media/Gaussian_data.png" width="450"/></p>
 
+Eventually, understanding these direction can help understand all sorts of data. For example, in images of faces,
+moving along the first few directions like the blue one above, translate to changing the direction of light, slight
+tilting of the head, etc.
+
+<p align="center"><img src="media/all_faces.gif" width="900"/></p>
+
+---
 # The goal
-Our data is in a $d$-dimensional space, and we would like to reduce it to some $k$ dimensional space
+Formally, our data is in a $d$-dimensional space, and we would like to reduce it to some $k$ dimensional space
 (with $k<d$ ). As we want to measure how much information we loose, we will think of it as a map $S:\mathbb{R}^d \to V'$
 where $V'\leq \mathbb{R}^d$ is an affine subspace of dimension $k$, namely a translation of a standard linear space $V'=v_0+V$ 
 where $V\leq \mathbb{R}^d$ is linear with $\dim(V)=k$. This way we can represent our points as $v_0+v$ where $v_0$ is fixed and 
