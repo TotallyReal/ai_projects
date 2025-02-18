@@ -1,4 +1,3 @@
-$\newcommand{\norm}[1]{\left\Vert #1\right\Vert }$
 # PCA: What we want and how we get there
 
 A big problem in learning, is that usually our data is in a very high dimensional space,
@@ -21,12 +20,12 @@ where $V\leq \mathbb{R}^d$ is linear with $\dim(V)=k$. This way we can represent
 $v$ is $d$-dimensional.
 
 Then we can measure its "reconstruction" error:
-$$\norm{x-S(x)}^2.$$
+$$\left\Vert{x-S(x)}\right\Vert^2.$$
 
 ### Probelm:
 > Given $n$ data points $\{x_1,...,x_n\}$ in a $d$-dimensional space, and a dimension $k<d$, find such an affine $k$-dimensional
 > subspace $V'$ and $S:\mathbb{R}^d\to V'$ which minimizes
->$$\min_{S, V'}{\sum_1 ^n \norm{x_i - S(x_i)}^2}.$$
+>$$\min_{S, V'}{\sum_1 ^n \left\Vert{x_i - S(x_i)}\right\Vert^2}.$$
 
 ### Remark:
 > There are other ways to measure how much information we retain. The main reason we use this one, is that it is 
@@ -37,20 +36,29 @@ $$\norm{x-S(x)}^2.$$
 
 Consider the simple case where $k=0$, or equivalently we "approximate" all the data points with a single point $v_0$. 
 Then the problem is
-$$\min_{v_0}{\sum_1 ^n \norm{x_i - v_0}^2}.$$
+$$\min_{v_0}{\sum_1 ^n \left\Vert{x_i - v_0}\right\Vert^2}.$$
 You can and should find $v_0$ using some simple derivatives (exercise). However, there is also an algebraic way to solve this 
 problem. It is a bit of an overkill for this simple problem, but there are at least two good reasons to understand it:
 - It gives another point of view on this problem, which is almost always a good thing, and
 - it generalizes to higher dimension, which we will soon need.
 
-If we use the $\norm{\cdot}^2$ notation on a matrix to mean the sum of squares of all its entries, then our goal is to minimize:
+If we use the $\left\Vert{\cdot}\right\Vert^2$ notation on a matrix to mean the sum of squares of all its entries, then our goal is to minimize:
+
 ```math
-\norm{\;\left(\begin{array}{cccc} | & | &  & |\\ x_{1} & x_{2} & \cdots & x_{n}\\ | & | &  & | \end{array}\right)-\left(\begin{array}{cccc} | & | &  & |\\ v_{0} & v_{0} & \cdots & v_{0}\\ | & | &  & | \end{array}\right)\;}^2.
+\left\Vert{\;
+\left(\begin{array}{cccc} 
+| & | &  & |\\ 
+x_{1} & x_{2} & \cdots & x_{n}\\ 
+| & | &  & | \end{array}\right) -
+\left(\begin{array}{cccc} 
+| & | &  & |\\ 
+v_{0} & v_{0} & \cdots & v_{0}\\ 
+| & | &  & | \end{array}\right)\;}\right\Vert^2.
 ```
 
 Let us denote by $X\in \mathbb{R}^{d\times n}$ the first matrix which has $x_i$ as columns. The second matrix can be written 
 as the product of column and row vectors $v_0 \cdot \bar{1} _ {n}^T$, so now we have the more compact form
-$$\min_{v_0}\norm {X - v_0\cdot \bar{1}_n^T }^2.$$
+$$\min_{v_0}\left\Vert {X - v_0\cdot \bar{1}_n^T }\right\Vert^2.$$
 
 Why is this new form so interesting?
 1. First, this is now a linear problem. Instead of $n$ different points and looking for some minimum to sum of square we have:
@@ -102,7 +110,7 @@ becomes much more powerful as we increase the dimension. For example consider th
 > but only to lines parallel to $u_1$. What can we say about $u_0$?
 
 The same approach as above produce the minimization problem of 
-$$\min_{u_0, \alpha_i}\norm {X - u_0\cdot \bar{1}_n^T -u_1 \cdot (\alpha_1,...,\alpha_n)}^2.$$
+$$\min_{u_0, \alpha_i}\left\Vert {X - u_0\cdot \bar{1}_n^T -u_1 \cdot (\alpha_1,...,\alpha_n)}\right\Vert^2.$$
 
 Thus, just like before, we look for the best approximation of $X$ in the linear subspace:
 $$V_1 = \{u_0\cdot \bar{1}_n^T + u_1 \cdot (\alpha_1,...,\alpha_n)\;:\;u_0\in \mathbb{R}^d, \alpha_i \in \mathbb{R} \}.$$
@@ -135,15 +143,15 @@ Suddenly, our image is full of right angles and Pythagoras is just waiting aroun
 
 ```math
 \begin{align}  
-\sum_i\norm{red_i-green_i}^2 & =\sum_i \norm{red_i-\mathbb{E}(green_i)}^2-\sum_i\norm{green_i-\mathbb{E}(green_i)}^2. \\
-\sum_i\norm{red_i-pruple_i}^2 & =\sum_i \norm{red_i-\mathbb{E}(pruple_i)}^2-\sum_i\norm{pruple_i-\mathbb{E}(pruple_i)}^2.
+\sum_i\left\Vert{red_i-green_i}\right\Vert^2 & =\sum_i \left\Vert{red_i-\mathbb{E}(green_i)}\right\Vert^2-\sum_i\left\Vert{green_i-\mathbb{E}(green_i)}\right\Vert^2. \\
+\sum_i\left\Vert{red_i-pruple_i}\right\Vert^2 & =\sum_i \left\Vert{red_i-\mathbb{E}(pruple_i)}\right\Vert^2-\sum_i\left\Vert{pruple_i-\mathbb{E}(pruple_i)}\right\Vert^2.
 \end{align}
 ```
 
 What we want to minimize the left hand side, and to choose either the green or purple projections.
 The fact that the green and purple points on both lines are translations of on another ,shows that on the right
 hand side above we have
-$$\sum_i\norm{green_i-\mathbb{E}(green_i)}^2 = \sum_i\norm{pruple_i-\mathbb{E}(pruple_i)}^2.$$
+$$\sum_i\left\Vert{green_i-\mathbb{E}(green_i)}\right\Vert^2 = \sum_i\left\Vert{pruple_i-\mathbb{E}(pruple_i)}\right\Vert^2.$$
 
 We conclude, that instead of checking the distance from the different green\purple points, we can check the distances 
 to their average, and compare them. But now we can use the previous section which tell us that **the best** single-point
@@ -164,7 +172,7 @@ Note that the "least" amount of data we can get is if $x_i=v_0$ for all $i$, nam
 use our new "centered" data $Y=X-\mathbb{E}(X)\cdot \bar{1}_n^T$, then this is simply means that $Y=0$. So we have some new:
 
 ### Intuition
-> The bigger $\norm{Y}^2$ is, the "more" data we have.
+> The bigger $\left\Vert{Y}\right\Vert^2$ is, the "more" data we have.
 
 We shall make this intuition more formal below.
 
@@ -176,7 +184,7 @@ We can now reduce our discussion to the "simpler" problem:
 ### Probelm
 > Fix $x_1,...,x_n\in \mathbb{R} ^d$ and some $k<d$. For a subspace $V\leq \mathbb{R} ^d$ of dimension $k$, let $P_V$ be the 
 > orthogonal projection to that subspace. Minimize the following:
-> $$\min_V\norm{X-P_V (X)}^2.$$
+> $$\min_V\left\Vert{X-P_V (X)}\right\Vert^2.$$
 
 ### Remark
 > The simplest orthogonal project to dimension $k$ is simply the projection on the first $k$ coordinates: 
@@ -186,24 +194,24 @@ We can now reduce our discussion to the "simpler" problem:
 > orthogonal projections into $k$-dimensions, and it is not too hard to show that any such projection can be written
 > as $UPU^T$ for some orthogonal matrix $U$.
 
-Let's open up the norm expression $\min_V\norm{X-P_V (X)}^2$ from above. 
+Let's open up the norm expression $\min_V\left\Vert{X-P_V (X)}\right\Vert^2$ from above. 
 - First, note that for any matrix, we can compute the norm as 
-   $$\norm{M}^2=tr(MM^T).$$
+   $$\left\Vert{M}\right\Vert^2=tr(MM^T).$$
   This is also a good point to recall that if both $A, B\in \mathbb{R}^{m\times \ell}$, then
    $$tr(AB^T)=tr(B^TA)=\sum_{i,j}A_{i,j}B_{i,j}.$$
 - Writing $X-P_V(X) = (I-P_V) X$ and using the properties of orthogonal projections we get:
    ```math
-   \begin{align}\norm{X-P_V (X)}^2 & =tr((I-P_V)XX^T(I-P_V)^T)=tr((I-P_V)^T(I-P_V)XX^T)\\
-                                      & =tr((I-P_V)XX^T) = \norm{X}^2 - \norm{P_VX}^2 \end{align}
+   \begin{align}\left\Vert{X-P_V (X)}\right\Vert^2 & =tr((I-P_V)XX^T(I-P_V)^T)=tr((I-P_V)^T(I-P_V)XX^T)\\
+                                      & =tr((I-P_V)XX^T) = \left\Vert{X}\right\Vert^2 - \left\Vert{P_VX}\right\Vert^2 \end{align}
    ```
   It follows that 
-    $$\min_{\dim(V)=k} \norm{X-P_V (X)}^2 = \norm{X}^2 - \max_{\dim(V)=k}\norm{P_VX}^2.$$
+    $$\min_{\dim(V)=k} \left\Vert{X-P_V (X)}\right\Vert^2 = \left\Vert{X}\right\Vert^2 - \max_{\dim(V)=k}\left\Vert{P_VX}\right\Vert^2.$$
 - Using the max notation instead of the min notation, is not only simpler to write, but also connects into our previous
-    intuition. If $\norm{X}^2$ measures how much information we have, then we want to keep $\norm{P_VX}^2$ as large as 
-    possible to retain all this information. At best, it can be $\norm{X}^2$, and at worst, if everything collapsed into 
+    intuition. If $\left\Vert{X}\right\Vert^2$ measures how much information we have, then we want to keep $\left\Vert{P_VX}\right\Vert^2$ as large as 
+    possible to retain all this information. At best, it can be $\left\Vert{X}\right\Vert^2$, and at worst, if everything collapsed into 
     a single point, it will be $0$.
 - Finally, returning to the trace notation, we have:
-   $$\norm{P_V (X)}^2=tr(P_V XX^T).$$
+   $$\left\Vert{P_V (X)}\right\Vert^2=tr(P_V XX^T).$$
 
 The matrix $XX^T\in \mathbb{R}^{d\times d}$ can be quite intimidating, however, it has two very interesting properties:
 - **symmetric**: $(XX^T) ^T = XX^T$.
@@ -224,7 +232,7 @@ There is a very important theorem called **spectral decomposition** that tells u
 > theorem is usually used to prove the existence of SVD.
 
 Pluging this into our expression from above for $M=XX^T$ we obtain:
-   $$\norm{P_VX}^2=tr(P_VXX^T) =tr(P_VUDU^T) = tr(U^TP_VUD).$$
+   $$\left\Vert{P_VX}\right\Vert^2=tr(P_VXX^T) =tr(P_VUDU^T) = tr(U^TP_VUD).$$
 
 This is basically the same problem that we started with, but much simpler:
 - The matrix $U^TP_VU$ is still an orthogonal projection of dimension $k$, but on the space $U^T(V)$ instead of $V$.
