@@ -200,11 +200,13 @@ Let's open up the norm expression $\min_V\left\Vert{X-P_V (X)}\right\Vert^2$ fro
   This is also a good point to recall that if both $A, B\in \mathbb{R}^{m\times \ell}$, then
    $$tr(AB^T)=tr(B^TA)=\sum_{i,j}A_{i,j}B_{i,j}.$$
 - Writing $X-P_V(X) = (I-P_V) X$ and using the properties of orthogonal projections we get:
-   ```math
-   \begin{align}\left\Vert{X-P_V (X)}\right\Vert^2 & =tr((I-P_V)XX^T(I-P_V)^T)=tr((I-P_V)^T(I-P_V)XX^T)\\
-                                      & =tr((I-P_V)XX^T) = \left\Vert{X}\right\Vert^2 - \left\Vert{P_VX}\right\Vert^2 \end{align}
-   ```
-  It follows that 
+```math
+\begin{align}
+\left\Vert{X-P_V (X)}\right\Vert^2 & =tr((I-P_V)XX^T(I-P_V)^T)=tr((I-P_V)^T(I-P_V)XX^T)\\
+& =tr((I-P_V)XX^T) = \left\Vert{X}\right\Vert^2 - \left\Vert{P_VX}\right\Vert^2
+\end{align}
+  ```
+- It follows that 
     $$\min_{\dim(V)=k} \left\Vert{X-P_V (X)}\right\Vert^2 = \left\Vert{X}\right\Vert^2 - \max_{\dim(V)=k}\left\Vert{P_VX}\right\Vert^2.$$
 - Using the max notation instead of the min notation, is not only simpler to write, but also connects into our previous
     intuition. If $\left\Vert{X}\right\Vert^2$ measures how much information we have, then we want to keep $\left\Vert{P_VX}\right\Vert^2$ as large as 
