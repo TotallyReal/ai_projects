@@ -256,7 +256,7 @@ Therefore $tr(P_W\cdot D)=\lambda_1+\lambda_2+\cdots +\lambda_k$. Recall that $\
 so for these simple projection on $k$ coordinates we can't do better, and we claim that this is actually true in general. But
 before we prove it, we have to give some geometric interpretation to what we do.
 
-<p align="center"><img src="media/gaussian.png" width="900"/></p>
+<p align="center"><img src="media/Gaussian.png" width="900"/></p>
 
 On the left is our original data, and the best dimension reduction to 1-dimension is onto the blue line. We then centered
 the data by subtracting the mean $\mathbb{E}(x):=\frac{1}{n}\sum x_i$. Finally, the spectral decomposition allowed us to align
