@@ -44,18 +44,12 @@ problem. It is a bit of an overkill for this simple problem, but there are at le
 - it generalizes to higher dimension, which we will soon need.
 
 If we use the $\norm{\cdot}^2$ notation on a matrix to mean the sum of squares of all its entries, then our goal is to minimize:
-$$\norm{\;\left[\begin{array}{cccc}
-| & | &  & |\\
-x_{1} & x_{2} & \cdots & x_{n}\\
-| & | &  & |
-\end{array}\right]-\left[\begin{array}{cccc}
-| & | &  & |\\
-v_{0} & v_{0} & \cdots & v_{0}\\
-| & | &  & |
-\end{array}\right]\;}^2.$$
+```math
+\norm{\;\left(\begin{array}{cccc} | & | &  & |\\ x_{1} & x_{2} & \cdots & x_{n}\\ | & | &  & | \end{array}\right)-\left(\begin{array}{cccc} | & | &  & |\\ v_{0} & v_{0} & \cdots & v_{0}\\ | & | &  & | \end{array}\right)\;}^2.
+```
 
 Let us denote by $X\in \mathbb{R}^{d\times n}$ the first matrix which has $x_i$ as columns. The second matrix can be written 
-as the product of column and row vectors $v_0 \cdot \bar{1}_n^T$, so now we have the more compact form
+as the product of column and row vectors $v_0 \cdot \bar{1} _ {n}^T$, so now we have the more compact form
 $$\min_{v_0}\norm {X - v_0\cdot \bar{1}_n^T }^2.$$
 
 Why is this new form so interesting?
@@ -138,11 +132,13 @@ the purple projection $\mathbb{E}(purple_i)$ and the average of the original red
 perpendicular to $u_1$ !
 
 Suddenly, our image is full of right angles and Pythagoras is just waiting around the corner:
-$$
+
+```math
 \begin{align}  
 \sum_i\norm{red_i-green_i}^2 & =\sum_i \norm{red_i-\mathbb{E}(green_i)}^2-\sum_i\norm{green_i-\mathbb{E}(green_i)}^2. \\
 \sum_i\norm{red_i-pruple_i}^2 & =\sum_i \norm{red_i-\mathbb{E}(pruple_i)}^2-\sum_i\norm{pruple_i-\mathbb{E}(pruple_i)}^2.
-\end{align}$$ 
+\end{align}
+```
 
 What we want to minimize the left hand side, and to choose either the green or purple projections.
 The fact that the green and purple points on both lines are translations of on another ,shows that on the right
@@ -196,8 +192,10 @@ Let's open up the norm expression $\min_V\norm{X-P_V (X)}^2$ from above.
   This is also a good point to recall that if both $A, B\in \mathbb{R}^{m\times \ell}$, then
    $$tr(AB^T)=tr(B^TA)=\sum_{i,j}A_{i,j}B_{i,j}.$$
 - Writing $X-P_V(X) = (I-P_V) X$ and using the properties of orthogonal projections we get:
-    $$\begin{align}\norm{X-P_V (X)}^2 & =tr((I-P_V)XX^T(I-P_V)^T)=tr((I-P_V)^T(I-P_V)XX^T)\\
-                                      & =tr((I-P_V)XX^T) = \norm{X}^2 - \norm{P_VX}^2 \end{align}$$
+   ```math
+   \begin{align}\norm{X-P_V (X)}^2 & =tr((I-P_V)XX^T(I-P_V)^T)=tr((I-P_V)^T(I-P_V)XX^T)\\
+                                      & =tr((I-P_V)XX^T) = \norm{X}^2 - \norm{P_VX}^2 \end{align}
+   ```
   It follows that 
     $$\min_{\dim(V)=k} \norm{X-P_V (X)}^2 = \norm{X}^2 - \max_{\dim(V)=k}\norm{P_VX}^2.$$
 - Using the max notation instead of the min notation, is not only simpler to write, but also connects into our previous
@@ -236,28 +234,14 @@ Let's write $P_W=U^TP_VU$ to simplify notation, and we are left with the questio
 
 ### Problem:
 > Maximize the following:
-> $$ \max_{\dim(W)=k} tr(P_W D). $$
+> $$\max_{\dim(W)=k} tr(P_W D).$$
 
 A simple choice for $W$ is the span of the first $k$ coordinates, for which we get:
-$$P_W\cdot D = \begin{pmatrix}1\\
- & \ddots\\
- &  & 1\\
- &  &  & 0\\
- &  &  &  & \ddots\\
- &  &  &  &  & 0
-\end{pmatrix}\begin{pmatrix}\lambda_{1}\\
- & \ddots\\
- &  & \lambda_{k}\\
- &  &  & \lambda_{k+1}\\
- &  &  &  & \ddots\\
- &  &  &  &  & \lambda_{d}
-\end{pmatrix}=\begin{pmatrix}\lambda_{1}\\
- & \ddots\\
- &  & \lambda_{k}\\
- &  &  & 0\\
- &  &  &  & \ddots\\
- &  &  &  &  & 0
-\end{pmatrix}$$
+```math
+P_W\cdot D = \begin{pmatrix}1\\ & \ddots\\ &  & 1\\ &  &  & 0\\ &  &  &  & \ddots\\ &  &  &  &  & 0 \end{pmatrix}
+\begin{pmatrix}\lambda_{1}\\ & \ddots\\ &  & \lambda_{k}\\ &  &  & \lambda_{k+1}\\ &  &  &  & \ddots\\ &  &  &  &  & \lambda_{d}\end{pmatrix}=\begin{pmatrix}\lambda_{1}\\ & \ddots\\ &  & \lambda_{k}\\ &  &  & 0\\ &  &  &  & \ddots\\ &  &  &  &  & 0\end{pmatrix}
+```
+
 Therefore $tr(P_W\cdot D)=\lambda_1+\lambda_2+\cdots +\lambda_k$. Recall that $\lambda_1\geq \lambda_2 \geq \cdots \lambda_d\geq 0$,
 so for these simple projection on $k$ coordinates we can't do better, and we claim that this is actually true in general. But
 before we prove it, we have to give some geometric interpretation to what we do.
@@ -278,12 +262,16 @@ to work a little bit, but not too much.
 ### Proof:
 > We already know that the max is at least $\lambda_1+\cdots +\lambda_k$, which just need to show that it cannot be
 > bigger. Fix some orthogonal projection $P$, and note that
-> $$tr(PD) = \sum_1^n P_{i,i} \lambda_i.$$
+> ```math
+> tr(PD) = \sum_1^n P_{i,i} \lambda_i.
+> ```
 > Since $P$ is an orthogonal projection, it follows that $PP^T=I$ so that $|P_{i,j}|\leq 1$ for all $i,j$. If in 
 > addition if has rank $k$, we also have that $tr(P)=\sum P_{i,i}=k$. From both of these we get that:
-> $$\begin{align} |\sum_1^n P_{i,i} \lambda_i| &\leq \sum_1^n |P_{i,i}| \lambda_i \leq \sum_1^k |P_{i,i}| \lambda_i + \left(\sum_{k+1}^n |P_{i,i}|\right) \lambda_k \\
-                        & = \sum_1^k |P_{i,i}| \lambda_i + \left(k-\sum_1^k |P_{i,i}|\right) \lambda_k   = \sum_1^k |P_{i,i}| \lambda_i + \sum_1^k (1-|P_{i,i}|)\lambda_k \\
-                        & \leq \sum_1^k |P_{i,i}| \lambda_i + \sum_1^k (1-|P_{i,i}|)\lambda_i = \sum_1^k \lambda_i\end{align} $$
+> ```math
+> \begin{align} |\sum_1^n P_{i,i} \lambda_i| &\leq \sum_1^n |P_{i,i}| \lambda_i \leq \sum_1^k |P_{i,i}| \lambda_i + \left(\sum_{k+1}^n |P_{i,i}|\right) \lambda_k \\
+> & = \sum_1^k |P_{i,i}| \lambda_i + \left(k-\sum_1^k |P_{i,i}|\right) \lambda_k   = \sum_1^k |P_{i,i}| \lambda_i + \sum_1^k (1-|P_{i,i}|)\lambda_k \\
+>                        & \leq \sum_1^k |P_{i,i}| \lambda_i + \sum_1^k (1-|P_{i,i}|)\lambda_i = \sum_1^k \lambda_i\end{align} 
+>                        ```
 
 
 ---
@@ -291,11 +279,13 @@ to work a little bit, but not too much.
 
 So let's put everything together. 
 1. We are given $n$ datapoints $x_i \in \mathbb{R}^d$, which we point in a single matrix:
-    $$X = \left[\begin{array}{cccc}
-| & | &  & |\\
-x_{1} & x_{2} & \cdots & x_{n}\\
-| & | &  & |
-\end{array}\right]$$
+```math
+    X = \left(\begin{array}{cccc}
+      | & | &  & |\\
+      x_{1} & x_{2} & \cdots & x_{n}\\
+      | & | &  & |
+      \end{array}\right)
+```
 2. We center the matrix by removing the average of the columns:
     $$Y=X-\mathbb{E}(X)\cdot \bar{1}_n^T$$
 3. We compute the matrix $YY^T\in\mathbb{R}^{d\times d}$, which is usually called the covariance matrix.
