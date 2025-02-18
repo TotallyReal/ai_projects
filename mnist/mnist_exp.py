@@ -4,7 +4,6 @@ import numpy as np
 import os
 from typing import List, Tuple, Optional, Iterator, Callable, TypeVar
 
-from fashion_mnist.fashion_exp import up_to_label
 from misc import Timer
 
 timer = Timer()
@@ -19,7 +18,7 @@ from general.models import SimpleClassifier, ModelParameters
 from general.xp_data import XpData
 
 from general.image_data import ImageData, ImageDataParameters
-from general import analyse_data
+from general import analyse_data, image_data
 
 
 timer.time(msg='finish imports')
@@ -105,7 +104,7 @@ class MnistParameters:
 
 params = MnistParameters(
     seed=1,                     # model
-    up_to_label=10,             # data
+    up_to_label=2,             # data
     learning_rate=0.001,        # training
     hidden=(),                  # model
     batch_size=128,             # data
@@ -129,7 +128,7 @@ model = SimpleClassifier(dimensions=[28 * 28] + list(params.hidden) + [params.up
 def plot_layer0_filters(model: SimpleClassifier):
     arr = model.get_linear_layer(0).weight.detach().cpu().numpy()
     arr = arr.reshape(arr.shape[0], 28, 28)
-    visualization.plot_filters(arr)
+    visualization.plot_images(arr)
 
 
 # <editor-fold desc=" ------------------------ Training with animation on 2D outputs ------------------------">
@@ -310,32 +309,47 @@ IteratorFactory = Callable[[],Iterator[T]]
 
 run_save_errors = True
 
+up_to_label = 2
 running_data = XpData(
-    file_path=f'running_data{params.up_to_label}.csv',
-    data_cls=MnistParameters,
+    file_path=f'mnist_data{up_to_label}.csv',
+    data_cls=analyse_data.Parameters,
     values = dict(train_error_rate=float, test_error_rate=float))
-up_to_label = 10
+
+# database.plot_examples()
+
+# analyse_data.save_errors(
+#     running_data=running_data, test_loader=test_loader,
+#     model_generator = lambda: SimpleClassifier.generate_from_parameters(
+#         seeds                   =[1, 10, 100, 1000],
+#         linear_layer_dimensions =[(28*28,)+hidden+(up_to_label,) for hidden in [()]]),
+#     data_generator = lambda: database.train_loaders_from_parameters(
+#         up_to_label             =[up_to_label],
+#         batch_sizes             =[64]
+#     ),
+#     training_generator = lambda: TrainingParameters.from_parameters(
+#         learning_rates          =[0.001],
+#         epoch_list              =[5])
+# )
+
+# analyse_data.errors_per_epoch(
+#     running_data,
+#     # seed = 100,
+#     learning_rate=0.001,
+#     hidden=(),
+#     batch_size=64
+# )
 
 
-analyse_data.save_errors(
-    running_data=running_data, test_loader=test_loader,
-    model_generator = lambda: SimpleClassifier.generate_from_parameters(
-        seeds                   =[10],
-        linear_layer_dimensions =[(28*28,)+hidden+(up_to_label,) for hidden in [()]]),
-    data_generator = lambda: database.train_loaders_from_parameters(
-        up_to_label             =[up_to_label],
-        batch_sizes             =[64]
-    ),
-    training_generator = lambda: TrainingParameters.from_parameters(
-        learning_rates          =[0.001],
-        epoch_list              =[20])
-)
+# for X_test, Y_test in test_loader:
+#     break  # because I hate python!!!
+# Y_test = Y_test.detach().numpy()
+# X_test = X_test.detach().numpy()
+# X_test = X_test.reshape(X_test.shape[0], -1)
 
-analyse_data.errors_per_epoch(
-    running_data,
-    seed = 10,
-    learning_rate=0.001,
-    hidden=(),
-    batch_size=64
-)
+# arr = np.squeeze(X_test[Y_test == 0])
+
+# visualization.plot_images(
+#     arr = arr[:20],
+# )
+# visualization.pca_visualize(arr, 10)
 

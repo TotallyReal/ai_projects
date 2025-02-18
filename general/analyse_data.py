@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
-from typing import Callable, Iterator, Tuple, TypeVar
+from typing import Callable, Iterator, Tuple, TypeVar, Optional
 import torch
 from torch.utils.data import DataLoader
 from general.model_tester import TrainingParameters
@@ -122,27 +122,41 @@ def save_errors(
 
 def errors_per_epoch(
         data: XpData,
-        seed: int = 1,
+        seed: Optional[int] = None,
         learning_rate: float = 0.001,
         hidden: Tuple[int, ...] = (),
         batch_size: int = 64):
-    # 1. Extract rows where 'hidden' is an empty tuple
-    filtered_df = data.df[data.df['hidden'].apply(lambda x: x == hidden)]
-    filtered_df = filtered_df[filtered_df['seed'] == seed]
-    filtered_df = filtered_df[filtered_df['batch_size'] == batch_size]
-    filtered_df = filtered_df[filtered_df['learning_rate'] == learning_rate]
 
-    # 2. Extract relevant columns
-    epochs = filtered_df['epochs']
-    train_error = filtered_df['train_error_rate']
-    test_error = filtered_df['test_error_rate']
+    # Filter the database
+    df = data.df
 
-    # 3. Plot the error rates
+    df = df[df['hidden'].apply(lambda x: x == hidden)]
+    df = df[df['batch_size'] == batch_size]
+    df = df[df['learning_rate'] == learning_rate]
+    if seed is not None:
+        df = df[df['seed'] == seed]
+    if df.empty:
+        print('The data frame is empty. Cannot plot errors(epochs)')
+        return
+
     plt.figure(figsize=(8, 5))
-    plt.plot(epochs, train_error, label="Train Error Rate", color='blue')
-    plt.plot(epochs, test_error, label="Test Error Rate", color='red')
 
-    x_max = max(epochs)
+    # Extract relevant columns
+    if seed is not None:
+        epochs      = df['epochs']
+        train_error = df['train_error_rate']
+        test_error  = df['test_error_rate']
+        plt.plot(epochs, train_error, label="Train Error Rate", color='blue')
+        plt.plot(epochs, test_error, label="Test Error Rate", color='red')
+    else:
+        for seed in df['seed'].unique():
+            subset = df[df['seed'] == seed]
+            plt.plot(subset['epochs'], subset['train_error_rate'], 'r-', alpha=0.6,
+                     label=f"Train (Seed {seed})" if seed == df['seed'].unique()[0] else "")
+            plt.plot(subset['epochs'], subset['test_error_rate'], 'b-', alpha=0.6,
+                     label=f"Test (Seed {seed})" if seed == df['seed'].unique()[0] else "")
+
+    x_max = max(df['epochs'])
     plt.xticks(range(1, x_max, 1))
     plt.xlim(1,x_max)
 

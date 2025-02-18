@@ -70,7 +70,7 @@ class ImageData:
                 # squeezing the gray scale channel which is of dimension 1
                 images[position[label]] = image.squeeze()
                 counter -= 1
-        visualization.plot_filters(images, labels=[self.label_names[i] for i in labels])
+        visualization.plot_images(images, labels=[self.label_names[i] for i in labels])
 
     @functools.lru_cache
     def train_loader(self, up_to_label:int, batch_size: int) -> DataLoader:
@@ -177,3 +177,4 @@ class OutputProgressCollector:
             animation.save(f"{save_animation_file}.gif", fps=10, writer="imagemagick")  # or use .mp4 for video format
 
 # </editor-fold>
+

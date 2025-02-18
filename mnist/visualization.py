@@ -1,8 +1,12 @@
+import itertools
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
 from typing import List, Tuple, Dict, Optional
+from sklearn.decomposition import PCA
+from matplotlib.widgets import Slider
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 
 def scatter_animation(data: List[Tuple[str, np.ndarray]], labels: np.ndarray):
@@ -67,29 +71,36 @@ def scatter_animation(data: List[Tuple[str, np.ndarray]], labels: np.ndarray):
 
     return animation
 
+def balanced_grids(num_cells: int, max_cols: int = 5):
+    n_cols = max_cols
+    for i in range(max_cols):
+        if num_cells % (i+1) == 0 and int(num_cells//(i+1)) <= i+1:
+            n_cols = i+1
+    n_rows = int(np.ceil(num_cells/n_cols))
 
-def plot_filters(arr :np.ndarray, labels = Optional[List[str]]):
+    return n_rows, n_cols
+
+def balanced_axes_grids(num_cells: int, max_cols: int = 5):
+    n_rows, n_cols = balanced_grids(num_cells, max_cols)
+
+    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(n_cols * 2, n_rows * 2))
+    if len(axes) == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+    for ax in axes:
+        ax.axis('off')
+
+    return fig, axes
+
+def plot_images(arr :np.ndarray, labels: Optional[List[str]] = None):
     """
     Plots up to 10 images in a grid.
     Input should be of shape k x n x n
     """
-    k = len(arr)
-
-    if labels is None:
-        labels = [''] * k
-
-    n_cols = 5
-    for i in range(5):
-        if k % (i+1) == 0:
-            n_cols = i+1
-    n_rows = int(np.ceil(k/n_cols))
-
-    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(n_cols * 2, n_rows * 2))
-    axes = axes.flatten()
+    fig, axes = balanced_axes_grids(num_cells=len(arr),max_cols=5)
 
     for img_arr, ax, title in zip(arr, axes, labels):
         ax.imshow(img_arr, cmap='gray')
-        ax.axis('off')
         ax.set_title(title)
     plt.show()
 
@@ -201,5 +212,81 @@ def plot_more_filters(
 
     # mouse over event
     mplcursors.cursor(scatter, hover=True).connect("add", on_add)
+
+    plt.show()
+
+
+def pca_visualize(arr:np.ndarray, k: int):
+    mean_image = np.squeeze(np.mean(arr, axis=0))
+    sample_size, h, w = arr.shape
+    arr = arr.reshape(sample_size, -1)
+
+    pca = PCA()
+    pca.fit(arr)
+
+    sorted_indices = np.argsort(-pca.explained_variance_)  # Sort in descending order
+    directions = pca.components_[sorted_indices][:k]
+    directions = np.array([direction.reshape(h, w) for direction in directions])
+    lengths = np.array(pca.explained_variance_[sorted_indices][:k])
+
+    n_rows, n_cols = balanced_grids(num_cells=k+1, max_cols=10)
+    print(f'{n_rows=}, {n_cols=}')
+
+    fig = plt.figure(figsize=(2 * n_cols, 2 * n_rows))
+    gs_main = GridSpec(n_rows, n_cols, figure=fig)
+
+    positions = itertools.product(range(n_rows), range(n_cols))
+
+    gs_sub = GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_main[next(positions)], height_ratios=[10, 1])
+    ax_image = fig.add_subplot(gs_sub[0, 0])  # Image
+    ax_image.axis('off')
+
+    avg_image = ax_image.imshow(mean_image, cmap='gray')
+    ax_image.set_title('mean image')
+
+    sliders = []
+    slider_values = np.zeros(k)
+
+    def update_plot():
+        new_img = np.tensordot(slider_values * lengths, directions, axes=(0, 0)) + mean_image
+        avg_image.set_data(new_img)
+
+    def update_value_with_plot(val, idx):
+        slider_values[idx] = val
+        update_plot()
+
+    for index, position, direction, length in zip(range(k), positions, directions[:k], lengths[:k]):
+        gs_sub = GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_main[position], height_ratios=[10, 1])
+
+        ax_image = fig.add_subplot(gs_sub[0, 0])  # Image
+        ax_image.axis('off')
+        max_value = np.max(np.abs(direction))
+        im = ax_image.imshow(direction, cmap='coolwarm', vmin=-max_value, vmax=max_value)
+        ax_image.set_title(f'{length:.3f} [{max_value:.2f}]')
+
+        ax_slider = fig.add_subplot(gs_sub[1, 0])  # Slider
+        # slider_values[index] = (arr[1] - mean_image.flatten()) @ direction.flatten()/length
+        # print(slider_values[index])
+        slider = Slider(ax_slider, f'', -1.0, 1.0, valinit=slider_values[index])
+        slider.on_changed(lambda val, idx=index: update_value_with_plot(val, idx))
+        sliders.append(slider) # The slider loses the ability to move if the variable is out of scope
+    update_plot()
+    # cbar = fig.colorbar(im, orientation='horizontal', fraction=0.05, pad=0.1)
+
+    # Initialization function: plot the background of each frame
+    # def init():
+    #     return [avg_image]
+
+    # num_frames = 60
+    #
+    # # Update function: update the data for each frame
+    # def update(frame_index):
+    #     print(f'update {frame_index}')
+    #     update_value_with_plot(np.sin((2*np.pi/num_frames)*frame_index), 5)
+    #     return [avg_image]
+
+    # Create the animation
+    # animation = FuncAnimation(fig, update, frames=num_frames, init_func=init, blit=True)
+    # animation.save(f"faces.gif", fps=30, writer="imagemagick")  # or use .mp4 for video format
 
     plt.show()
