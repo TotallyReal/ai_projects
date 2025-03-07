@@ -105,17 +105,23 @@ $$\pmatrix{\tilde{u}_1 & \tilde{u}_2 & 1 & 0 & 0 & 0 & -\tilde{u}_1\tilde{v}_1 &
 \pmatrix{A_{1,1}\\A_{1,2}\\A_{1,3}\\A_{2,1}\\A_{2,2}\\A_{2,3}\\A_{3,1}\\A_{3,2}\\A_{3,3}\\}
 =\pmatrix{0\\0}$$
 
-The matrix $A$ has 9 entries, and each pair $u,v$ gives us 2 equation, so 5 pairs should be enough. Or maybe not?
+The matrix $A$ has 9 entries, and each pair $u,v$ gives us 2 equations, so 5 pairs should be enough. Or maybe not?
 
-The equation above has one obvious solution - take $A=0$. However, $A=0$ cannot be a proper solution to our original 
-problem, since it represent an orientation in space, and in particular must be invertible. In other words, the space
-of solutions to the homogenous equations above (as we run over the pairs $(v^{(i)}, u^{(i)})$) should be of dimension
-at least 1, and we need to choose some nonzero solution $A$ in this space. Note that if $A\neq 0$ is a solution, then
-so is $\lambda A$ for any $\lambda \neq 0$ - it is a vector space after all. This should not be too surprising, since
-$A$ and $\lambda A$ represent the "same" orientation. The left, up and forward direction have the same direction but
-different magnitudes, and when we think of orientation, we only think of the directions without  the magnitudes. More formally
-we want a matrix in $\mathrm{O}_3(\mathbb{R})$ and not $\mathrm{GL}_3(\mathbb{R})$. Computationally, it is easier to look for 
-a general matrix and then normalize it, than to look for a matrix in $\mathrm{O}_3(\mathbb{R})$ from the start.
+- The equation above has one obvious solution - take $A=0$. Indeed, this whole computation was just to find $A$ such that
+$v$ and $Au$ are on the same line through the origin, which is automatically true when $A=0$.
+However, $A=0$ cannot be a proper solution to our original problem, since it represent an orientation in space, and in 
+particular must be invertible. In other words, we need a nonzero solution to the homogeneous system of linear equations 
+above, as we run over the pairs $(v^{(i)}, u^{(i)})$. 
+- Moreover, if $A\neq 0$ is a solution, then of course so is $\lambda A$ for any $\lambda \neq 0$ - it is a vector space 
+after all. This means that if there is a nonzero solution it is not unique. This should not be too surprising, since
+$A$ and $\lambda A$ represent the "same" orientation up to projection. The left, up and forward direction have the same 
+direction but different magnitudes, and when we think of orientation, we only think of the directions without  the magnitudes. 
+- Thus, we actually want the space of solutions to be of dimension 1, so up to a scalar multiplication (projectiveness)
+there is a unique nonzero solution.
+
+Ignoring a little bit all sorts of settings in our camera, we may assume that its forward, up and left directions form 
+an orthonormal basis to the space, so that $A$ should actually be in $\mathrm{O}_3(\mathbb{R})$ and not just 
+$\mathrm{GL}_3(\mathbb{R})$. 
 
 To summarize, four pairs are already enough (assuming independence), and we look for a nonzero solution to the homogenous
 equations from above.
@@ -131,7 +137,7 @@ and use them to extract $A$. In other words we guess the scalar $\lambda_v, \lam
 , and $u=\lambda_u \tilde{u}$ so that 
 $$ \lambda_v \tilde{v} = A\lambda_u \tilde {u}.$$
 
-Geometrically, this means that $\tilde{v},A\tilde{u}$ are on the same line. Since our images **only** see projection,
+Geometrically, this means that $\tilde{v},A\tilde{u}$ are on the same line. Since our images **only see projections**,
 we only have information about the lines through the cameras and not absolute positions in the space.
 
 ### Question
@@ -154,6 +160,9 @@ Going back to our problem, finding $A$ for which $\tilde{v},A\tilde{u}$ are on t
 $$\tilde{v} \times A\tilde{u} = \bar{0},$$
 and you should check that these are equivalent to the equations from the previous section.
 
+### Remark
+> In this formulation it is easy to see that the solutions is a linear space, since the map 
+> $A\mapsto \tilde{v}\times A\tilde{u}$ is linear, and we are looking for its null space.
 
 
 # Enters the noise
@@ -181,6 +190,10 @@ that $|A|=\sqrt{\sum A_{i,j}^2}=1$.
 
 This is no longer a standard problem of linear system of equation. Luckily for us, a little bit of geometry (=inner product spaces)
 is all we need.
+
+### Remark:
+> You can solve it also using some Lagrange multipliers. However, for me at least, this never really gave any geometric
+> intuition, so I prefer to think about it using inner products.
 
 ### Theorem:
 > Let $B \in \mathbb{R}^{n\times n}$ be a symmetric real matrix. Then $B=Q^TDQ$ where $Q^{-1}=Q^T$ is an orthogonal matrix
@@ -223,26 +236,46 @@ Trying the same trick from the $P=0$ will not work, since:
 
 $$\tilde{v}=\frac{1}{v_3} v = \frac{1}{(P+Au)_3} (P+Au) = \frac{1}{(\frac{1}{u_3}P+A\frac{1}{u_3}u)_3} \left(\frac{1}{u_3}P+A\left(\frac{1}{u_3}u\right)\right) = \frac{1}{(\frac{1}{u_3}P+A\tilde{u})_3} \left(\frac{1}{u_3}P+A\tilde{u}\right).$$
 We switched from the $u,v$ vectors to their projections $\tilde{u}, \tilde{v}$, but we could not get rid of the normalization
-scalar $u_3$, because it still divides $P$.
+scalar $u_3$, because it still divides $P$. However, we are not too far off.
 
-The trick here, is that just like $u,v$ are only known up to their generated lines, so does $P$. So let's start by
-taking the crossed product with $P$ to get rid of it:
-$$P \times v = P\times (Au).$$
+We already saw that this simple algebraic manipulation that worked before, can be done much cleaner using cross products:
+$$0 = v\times v = v\times P + v\times Au.$$
+Instead of three terms, we only have two. To get rid of another term, recall that $v\times P$ is perpendicular to both $P$
+and $v$ so let's take the inner product with $P$ (why not $v$?):
+$$0=\left\langle P,0 \right\rangle=\left\langle P,v\times P \right\rangle+\left\langle P,v\times Au \right\rangle = \left\langle P,v\times Au \right\rangle.$$
+The notation is a bit more complicated, but it is now one big product, which is linear in both $A$ and $P$. If we knew 
+one of them, we could have used this equation to look for the other, just like in the $P=0$ case, but unfortunately we 
+need to find them both.
 
-The left hand side of the equation is a vector which is **always** perpendicualr to $v$, so taking the inner product with 
-$v$ gets us:
+The solution to this problem, is just as before: let's try to move all the "problems" into a single place. More formally
+instead of taking $v\times$ and then $\left\langle P, \cdot \right\rangle$, we switch it into $P\times$ and then $\left\langle v, \cdot \right\rangle$. 
+This will give us:
 $$0=\left\langle v, P \times v \right \rangle = \left\langle v, P\times (Au) \right \rangle.$$
 
-The crossed product $x\mapsto P\times x$ is a linear map, so we can express it as multiplication by a matrix $[P]_\times$:
+The crossed product $x\mapsto P\times x$ is a linear map, so we can express it as multiplication by a matrix $[P_\times]$:
 $$P\times x = \pmatrix{0 & -P_3 & P_2 \\P_3 & 0 & -P_1 \\-P_2 & P_1 & 0 } x$$
 
 All together, we got the equation:
-$$v^T ([P]_\times A) u = 0.$$
+$$v^T ([P_\times] A) u = 0.$$
 
-Here too, we have a homogenous linear equation in the entries of $([P]_\times A)$, which is not affected by multiplying 
-either $u$ or $v$ by some scalar. As we are looking for a nonzero solution, 8 such (independent) equations should be enough.
-Recall that $A$ is an invertible matrix, and when $P\neq 0$, the matrix $[P]_\times$ is of rank 2 (check to see that you
+Setting $F:=[P_\times] A$, here too we have a homogenous linear equation in the entries of $F$, which is unaffected by multiplying 
+either $u$ or $v$ by nonzero scalars. As we are looking for a nonzero solution, 8 such (independent) equations should be enough.
+
+### Question:
+>Knowing $[P_\times] A$, how can we extract $P$ and $A$?
+
+Recall that $A$ is an invertible matrix, and when $P\neq 0$, the matrix $[P_\times]$ is of rank 2 (check to see that you
 know why!). It follows that the solutions to:
-$$w^T [P]_\times A = 0,$$
-form a 1-dimensional space, and since it contains $P\neq 0$, any element in it is of the form $\lambda P$. Hence, once
-we fund $P$, we can compute $[P]_\times$ and find $A$ (all up to a nonzero scalar).
+$$w^T [P_\times] A = 0,$$
+forms a 1-dimensional space, and since it contains $P\neq 0$, it is exactly $span\{P\}$. In other words, up to a 
+scalar multiplication, we can find $P$.
+
+If $[P_\times]$ was invertible, then we could have easily found $A=[P_\times]^{-1}F$. However, this doesn't hold here,
+so we need some way to extract the rank 2 part from $F$, while keeping $A$ intact. Luckily for us, both $[P_\times]$ and
+$A$ have nice geometric structure that we can use: 
+- $[P_\times]$ is a **skew symmetric** real matrix,
+- $A$ is an orthogonal matrix, with determinant 1.
+
+As this is a bit more technical, and has some independent mathematical interesting ideas, I put it in a 
+[different document here](skew_symmetric_orthogonal.md).
+
