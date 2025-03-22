@@ -1,3 +1,8 @@
+# https://medium.com/@russmislam/implementing-sift-in-python-a-complete-guide-part-1-306a99b50aa5
+# https://www.ipol.im/pub/art/2014/82/article_lr.pdf
+# https://www.youtube.com/watch?v=ram-jbLJjFg&t=286s&ab_channel=FirstPrinciplesofComputerVision
+
+
 import copy
 import cv2
 from dataclasses import dataclass, field
@@ -424,10 +429,10 @@ def create_descriptors(
 # </editor-fold>
 
 
-image_name = 'stitch2_10'
-img_path = f'images/{image_name}.jpg'
-image = mpimg.imread(img_path)
-image = np.mean(image, axis=2)
+# image_name = 'stitch2_10'
+# img_path = f'images/{image_name}.jpg'
+# image = mpimg.imread(img_path)
+# image = np.mean(image, axis=2)
 
 sigma_min  = 0.8
 delta_min  = 0.5

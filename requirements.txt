@@ -1,7 +1,7 @@
 matplotlib~=3.10.0
+mplcursors~=0.6
 numpy~=2.0.2
+pandas~=2.2.3
+setuptools~=70.0.0
 torch~=2.5.1
 torchvision~=0.20.1
-mplcursors~=0.6
-pandas~=2.2.3
-setuptools~=68.2.0

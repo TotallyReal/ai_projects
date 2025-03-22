@@ -1,34 +1,14 @@
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+import numbers
 
+# ============================================================================= #
+#
+# See the panorama.ipynb file to see how to use this file
+#
+# ============================================================================= #
 
-def draw_matches(image1: np.ndarray, image2: np.ndarray, threshold: float = 0.7):
-    """
-    Standard matching between two images using the open cv library.
-    'threshold' should be a nonnegative number indicating how good of a matching we are looking for.
-    threshold==0 means that we only allow perfect matching (which basically only possible if you match a picture
-    with itself, and hope that no noise somehow got into the computations).
-    """
-    sift = cv2.SIFT_create()
-    keypoints1, descriptors1 = sift.detectAndCompute(image1, None)
-    keypoints2, descriptors2 = sift.detectAndCompute(image2, None)
-
-    bf_matcher = cv2.BFMatcher()
-    matches = bf_matcher.knnMatch(descriptors1, descriptors2, k=2)
-
-    # Apply ratio test to filter good matches
-    good_matches: List[cv2.DMatch] = []
-    for m, n in matches:
-        if m.distance < threshold * n.distance:
-            good_matches.append(m)
-
-    matched_img = cv2.drawMatches(image1, keypoints1, image2, keypoints2, good_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-
-    cv2.imshow("SIFT Matches", matched_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
 Point = Tuple[float, float]  # for (x,y) points
 
@@ -46,13 +26,13 @@ def find_projective_transform(correspondence: List[Tuple[Point, Point]]) -> np.n
     arr = np.array(lines)
     # If the rows for W are the lines generated above, and we consider A as a vector, then we are trying to solve:
     #           min |WA| , s.t. |A|=1
-    # Since |WA|=|A^T W^T*W A|, then using the spectral decomposition of the positive semi-definite matrix W^TW,
+    # Since |WA|=tr(A^T W^T*W A), then using the spectral decomposition of the positive semi-definite matrix W^TW,
     # we conclude that A is the eigenvector of W^T*W corresponding to the smallest eigenvalue.
     eigenvalues, eigenvectors = np.linalg.eigh(arr.T @ arr)
     return eigenvectors[:, 0].reshape(3, 3)
 
 def point_matching(
-        bf_matcher: cv2.BFMatcher,
+        bf_matcher: cv2.DescriptorMatcher,
         keypoints1: List[cv2.KeyPoint], descriptors1: List[np.ndarray],
         keypoints2: List[cv2.KeyPoint], descriptors2: List[np.ndarray],
         threshold: float = 0.5) -> List[Tuple[Point, Point]]:
@@ -68,49 +48,196 @@ def point_matching(
     # Create system of linear equations:
     return [(keypoints1[match.queryIdx].pt, keypoints2[match.trainIdx].pt) for match in good_matches]
 
-def proj_prod(matrix: np.ndarray, x, y):
-    result = matrix @ np.array([x,y,1])
-    return result[:2] / result[2]
+
+Point = Tuple[float, float]    # x, y
+
+class Rect:
+
+    @staticmethod
+    def from_image(image: np.ndarray):
+        h, w = image.shape[:2]
+        return Rect(0, 0, w, h)
+
+    def __init__(self, x:int, y:int, width:int, height:int):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+
+    def __str__(self):
+        return f'[({self.x},{self.y}), +({self.width},{self.height})]'
+
+    def __repr__(self):
+        return self.__str__()
+
+    def translate(self, dx, dy) -> 'Rect':
+        return Rect(self.x + dx, self.y + dy, self.width, self.height)
+
+    def in_local(self, points: List[Tuple[int, int]] | Tuple[int, int]) -> List[Tuple[int, int]]:
+        """
+        transform the points to the coordinates inside the rectangle (so self.x, self.y becomes 0,0)
+        """
+        if len(points) == 2 and all(isinstance(elem, numbers.Number) for elem in points):
+            x, y = points
+            return x-self.x, y-self.y
+        return [(x-self.x, y-self.y) for x, y in points]
+
+    def from_local(self, points: List[Tuple[int, int]] | Tuple[int, int]) -> List[Tuple[int, int]]:
+        """
+        transform the points from the coordinates inside the rectangle (so 0,0 becomes self.x, self.y)
+        """
+        if len(points) == 2 and all(isinstance(elem, numbers.Number) for elem in points):
+            x, y = points
+            return x+self.x, y+self.y
+        return [(x+self.x, y+self.y) for x, y in points]
+
+    def relative_to(self, domain: 'Rect') -> 'Rect':
+        return self.translate(-domain.x, -domain.y)
+
+    def intersect(self, other) -> 'Rect':
+        x1, y1 = max(self.x, other.x), max(self.y, other.y)
+        x2, y2 = min(self.x + self.width, other.x + other.width), min(self.y + self.height, other.y + other.height)
+        if x1 < x2 and y1 < y2:
+            return Rect(x1, y1, x2 - x1, y2 - y1)
+        return None  # No intersection
+
+    def union(self, other) -> 'Rect':
+        # Smallest rectangle containing both rectangles
+        x1, y1 = min(self.x, other.x), min(self.y, other.y)
+        x2, y2 = max(self.x + self.width, other.x + other.width), max(self.y + self.height, other.y + other.height)
+        return Rect(x1, y1, x2 - x1, y2 - y1)
+
+    def as_slices(self, x_first:bool=False) -> Tuple[slice, slice]:
+        x_slice = slice(self.x, self.x+self.width)
+        y_slice = slice(self.y, self.y+self.height)
+        if x_first:
+            return x_slice, y_slice
+        return y_slice, x_slice
+
+    def line_endpoints(self, a: float, b: float, c: float) -> Tuple[Point, Point]:
+        """
+        returns two endpoints of a segment in the line ax+by+c=0 which contains its intersection with this rectangle
+        the rectangle.
+        """
+        if b == 0: # vertical line
+            x = -c/a
+            return (x, self.y), (x, self.y + self.height)
+        else:
+            # y = -(ax+c)/b
+            return (self.x, -(a*self.x+c)/b), (self.x+self.width, -(a*(self.x+self.width)+c)/b)
+
+    def corners(self, projective: bool = False) -> np.ndarray:
+        """
+        returns the corners of this rect in an anticlock wise order.
+        The corners are a 2 x 4 array. If projective is true, then add a line of 1's.
+        """
+        x1, x2 = self.x, self.x + self.width
+        y1, y2 = self.y, self.y + self.height
+        if projective:
+            return np.array([
+                [x1, x2, x2, x1],
+                [y1, y1, y2, y2],
+                [ 1,  1,  1,  1]
+            ])
+        else:
+            return np.array([
+                [x1, x2, x2, x1],
+                [y1, y1, y2, y2]
+            ])
+
+    def apply_proj(self, proj: np.ndarray) -> 'Rect':
+        """
+        returns the smallest Rect which contains the image of this rect under the projective map
+        """
+        corners = self.corners(projective=True)
+        # x1, x2 = self.x, self.x + self.width
+        # y1, y2 = self.y, self.y + self.height
+        # corners = np.array([
+        #     [x1, x1, x2, x2],
+        #     [y1, y2, y1, y2],
+        #     [1, 1, 1, 1]
+        # ])
+        corners = proj @ corners
+        corners = corners[:2] / corners[2:3]
+        corners = np.round(corners).astype(int)
+
+        min_x, min_y = np.min(corners, axis=1)
+        max_x, max_y = np.max(corners, axis=1)
+        return Rect(min_x, min_y, max_x - min_x, max_y - min_y)
+
+
+
+def apply_proj(proj: np.ndarray, image: np.ndarray, domain: Optional[Rect] = None) -> Tuple[np.ndarray, Rect]:
+    """
+    Considering 'image' as a function f on R^2 (with values in R for gray and R^3 for RGB), We would like
+    to return the function :
+         (proj*f) (u,v) := f( proj^-1 (u,v) )
+
+    There are two problems:
+        1. f is defined on integers, while proj^-1 (u,v) are not necessarily integers. For that we use the
+           cv2.warpPerspective interpolation.
+        2. Both f and the returned function are represented using arrays, so they are defined on a rectangle
+           from (0,0) to some positive (h,w). We only compute (proj*f) in the given domain_x=[x0,x1], domain_y=[y0,y1]
+           so that:
+               result[i,j] = (proj*f) (x0+i, y0+j) = f( floor(proj^-1 (x0+i, y0+j)) )
+    """
+    if domain is None:
+        domain = Rect.from_image(image)
+
+    new_domain = domain.apply_proj(proj)
+
+    translation_to = np.array([
+        [1,0,-new_domain.x],
+        [0,1,-new_domain.y],
+        [0,0,1]
+    ])
+    translation_from = np.array([
+        [1,0,domain.x],
+        [0,1,domain.y],
+        [0,0,1]
+    ])
+
+
+    return cv2.warpPerspective(
+        image, translation_to @ proj @ translation_from, (new_domain.width, new_domain.height)), new_domain
+
+
+
+def change_domain(image: np.ndarray, image_domain: Rect, to_domain: Rect):
+    domain = image_domain.intersect(to_domain)
+
+    shape = (to_domain.height, to_domain.width)
+    if len(image.shape) == 3:   # For RGB
+        shape += (3,)
+    result = np.zeros(shape=shape, dtype=image.dtype)
+
+    if domain is not None:
+        result[domain.relative_to(to_domain).as_slices()] = image[domain.relative_to(image_domain).as_slices()]
+
+    return result
+
 
 class ImagePart:
 
     def __init__(self, image: np.ndarray, transform: np.ndarray):
         self.image = image
         self.transform = transform
-        self.inv = np.linalg.inv(self.transform)
+        self.transformed_image, self.domain = apply_proj(self.transform, self.image)
+
+        # create weights
         self.h, self.w = image.shape[:2]
-        self.is_rgb = len(image.shape) == 3
 
-    def np_weights(self, world_pos: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Given the world position, return two arrays indicating the 'weight' and 'image value' for each position.
-        """
-        # Apply the projective map to find the position in local space
-        self_pos = np.tensordot(world_pos, self.inv.T, axes=1)
-        self_pos = self_pos[:, :, :2] / self_pos[:, :, 2:3]
+        rows = np.arange(0,1,1/self.h)
+        cols = np.arange(0,1,1/self.w)
 
-        self_pos = np.floor(self_pos).astype(int)       # TODO: change to some interpolation for better smoothening
+        row_weights = rows * (1 - rows)
+        col_weights = cols * (1 - cols)
+        self.weights = row_weights[:, np.newaxis] * col_weights[np.newaxis, :]
 
-        cols, rows = self_pos[:, :, 0], self_pos[:, :, 1]
-        valid_mask = (rows >= 0) & (rows < self.h) & (cols >= 0) & (cols < self.w)      # stay inside the bounds
+        self.transformed_weights, _ = apply_proj(self.transform, self.weights)
 
-        shape = self_pos.shape[:2] + (3,) if self.is_rgb else self_pos.shape[:2]
-        image_values = np.zeros(shape, dtype=self.image.dtype)
-        image_values[valid_mask] = self.image[rows[valid_mask], cols[valid_mask]]
-
-        # The larger the weight, the more inside the image we are
-        weights = rows * (self.h - rows) * cols * (self.w - cols) * valid_mask.astype(int)
-        if self.is_rgb:
-            weights = weights[:,:,np.newaxis]
-
-        return weights, image_values
-
-    def transformed_corners(self):
-        return [
-            proj_prod(self.transform, 0, 0),
-            proj_prod(self.transform, self.w, 0),
-            proj_prod(self.transform, self.w, self.h),
-            proj_prod(self.transform, 0, self.h)]
+        # self.inv = np.linalg.inv(self.transform)
+        # self.is_rgb = len(image.shape) == 3
 
 
 def stitch_images(images: List[np.ndarray]) -> np.ndarray:
@@ -136,55 +263,22 @@ def stitch_images(images: List[np.ndarray]) -> np.ndarray:
     #
     # TODO 2: Try to fit images not necessarily to the first one.
 
-    corners = sum([image_part.transformed_corners() for image_part in image_parts], [])  # corners1 + corners2
-    corners_x = [corner[0] for corner in corners]
-    corners_y = [corner[1] for corner in corners]
-    min_x = int(min(corners_x))
-    max_x = int(max(corners_x))
-    min_y = int(min(corners_y))
-    max_y = int(max(corners_y))
+    full_domain = image_parts[0].domain
+    for part in image_parts[1:]:
+        full_domain = full_domain.union(part.domain)
 
-    shape = (max_y - min_y + 1, max_x - min_x + 1)
-    # Create the 3D array where  positions[i,j] = (min_x+i, min_y+j, 1)
-    positions = np.dstack([np.indices(shape)[1], np.indices(shape)[0], np.ones(shape)]) + np.array([min_x, min_y, 0])
+    ext_images = [change_domain(part.transformed_image, part.domain, full_domain)
+                   for part in image_parts]
 
-    if is_rgb:
-        full_weights = np.zeros(shape=shape + (1,))
-        full_image = np.zeros(shape=shape + (3,))
-    else:
-        full_weights = np.zeros(shape=shape)
-        full_image = np.zeros(shape=shape)
+    ext_weights = [change_domain(part.transformed_weights, part.domain, full_domain)[:,:,np.newaxis]    # always RGB?
+                   for part in image_parts]
+    sum_weights = sum(ext_weights)
 
-    # Average over the different image parts
-    for image_part in image_parts:
-        part_weights, part_image_values = image_part.np_weights(positions)
-        full_weights += part_weights
-        full_image += part_image_values * part_weights
+    # we don't want to divide by zero
+    sum_weights[sum_weights == 0] = 1
 
-    full_weights[full_weights == 0] = 1
-    full_image /= full_weights
+    full_image = sum(weight*img for weight, img in zip(ext_weights, ext_images))
+    full_image /= sum_weights
 
     return full_image.astype(int)
 
-
-
-# --------------------------------------- Example how to use: ---------------------------------------
-
-images = [
-    cv2.resize(
-        cv2.imread(f'images/room/{i}.jpg', cv2.IMREAD_COLOR_RGB),
-        dsize=(0,0), fx=0.1, fy=0.1)
-    for i in [1,2,3,4]
-]
-
-if any(elem is None for elem in images):
-    raise ValueError("Could not load one of the images.")
-
-# To see the matches between pairs of images:
-# draw_matches(images[0],images[1], threshold=0.5)
-
-full_image = stitch_images(images)
-
-plt.imshow(full_image, cmap='gray')
-
-plt.show()
