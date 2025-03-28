@@ -69,7 +69,9 @@ $$ v = P + Au , u\in \mathbb{R}^3.$$
 In other words, with respect to the point of view, the coordinates are actually $u$. However, we don't really see $u$,
 but rather its projection to the 2D screen, namely:
 
-$$u=\pmatrix{u_1\\ u_2 \\ u_3} \mapsto \pmatrix{u_1/u_3\\ u_2/u_3 \\u_3/u_3} = \pmatrix{u_1/u_3\\ u_2/u_3 \\1}.$$
+```math
+u=\pmatrix{u_1\\ u_2 \\ u_3} \mapsto \pmatrix{u_1/u_3\\ u_2/u_3 \\u_3/u_3} = \pmatrix{u_1/u_3\\ u_2/u_3 \\1}.
+```
 
 ### Remark:
 > Ignore for now the case where $u_3=0$. These are considered "points at infinitely".
@@ -101,8 +103,11 @@ $$(A\tilde{u})_3\tilde{v} = A\tilde{u}.$$
 This is a system of linear equations in the entries of $A$! 
 
 More specifically, the third entry of the equation above is always true $(A\tilde{u})_3=(A\tilde{u})_3$, and the other two entries are:
+
 $$\sum_{j=1}^3 A_{3,j}\tilde{u}_j\tilde{v}_i = \sum_{j=1}^3 A_{i,j}\tilde{u}_j,\;\; i=1,2.$$
+
 Equivalently, we have:
+
 $$\pmatrix{\tilde{u}_1 & \tilde{u}_2 & 1 & 0 & 0 & 0 & -\tilde{u}_1\tilde{v}_1 & -\tilde{u}_2\tilde{v}_1 & -\tilde{v}_1 \\
            0 & 0 & 0 & \tilde{u}_1 & \tilde{u}_2 & 1 & -\tilde{u}_1\tilde{v}_2 & -\tilde{u}_2\tilde{v}_2 & -\tilde{v}_2  }
 \pmatrix{A_{1,1}\\A_{1,2}\\A_{1,3}\\A_{2,1}\\A_{2,2}\\A_{2,3}\\A_{3,1}\\A_{3,2}\\A_{3,3}\\}
@@ -302,6 +307,8 @@ usually don't give us a matching for every point in the image, as this can be a 
 
 However, now we have some clues which can help us do this full matching. Suppose that we are given a point in the first
 image $\tilde{v}$ and we want to find a match in the second image $\tilde{u}=\pmatrix{\tilde{u}_1 \\ \tilde{u}_2 \\ 1}$. We know that these points satisfy
+
 $$\tilde{v}^T [P_\times] A \pmatrix{\tilde{u}_1\\ \tilde{u}_2\\1} = 0,$$
+
 and all but $\tilde{u}_1, \tilde{u}_2$ are given, so this is an equation of a line. So now, we only need to check the 
 pixels along this line for a good matching.
