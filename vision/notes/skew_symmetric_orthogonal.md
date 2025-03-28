@@ -11,12 +11,15 @@ To define the position of a second camera relative to the first, we need:
 
 A previous interesting mathematical step lets us discover the matrix $[P_\times] \cdot K$ up to a nonzero 
 scalar multiplication, where $[P_\times]$ is the skew-symmetric matrix representing the cross product by $P$, namely:
-$$[P_\times]v=P\times v\;\;\;,\;\;\;[P_\times]=\pmatrix{0 & -P_3 & P_2 \\P_3 & 0 & -P_1 \\-P_2 & P_1 & 0 }.$$
+```math
+[P_\times]v=P\times v\;\;\;,\;\;\;[P_\times]=\pmatrix{0 & -P_3 & P_2 \\P_3 & 0 & -P_1 \\-P_2 & P_1 & 0 }.
+```
+
 
 Now the problem is to decompose it into $[P_\times]$ and $K$.
 
 ### Problem:
-> Let $P\in \mathbb{R}^3$ and $K\in \mathrm{SO}_3(\mathbb{R})$. Given $\alpha [P_\times]K$ for some
+> Let $P\in \mathbb{R}^3$ and $K\in SO_3(\mathbb{R})$. Given $\alpha [P_\times] K$ for some
 > unknown nonzero $\alpha\in\mathbb{R}^\times$, find $P$ and $K$.
 
 ### Remark:
@@ -32,7 +35,9 @@ is independent of the choice of $\alpha$.
 
 It is not hard to check that $P$ itself is in the left null space, namely $P^T \cdot [P_\times] K = 0$,
 indeed, we have:
+
 $$v^T [P_\times] = ([P_\times]^T v)^T = -([P_\times]v)^T=-(P\times v)^T.$$
+
 Thus, $P$ generates the left null space of $\lambda[P_\times]K$ so we can find it up to a scalar multiplication,
 which is the best that we can do.
 
@@ -50,12 +55,21 @@ $[P_\times]$ is diagonalizable.
 
 Using our ever most helpful and stronger theorem about spectral decomposition for normal operators, we actually know that
 we can diagonalize it with a unitary matrix:
-$$[P_\times] = UDU^*,\; UU^*=I,\; D=\pmatrix{\lambda i & 0 & 0 \\ 0 & -\lambda i & 0 \\ 0 & 0 & 0}.$$
+
+```math
+[P_\times] = UDU^*,\; UU^*=I,\; D=\pmatrix{\lambda i & 0 & 0 \\ 0 & -\lambda i & 0 \\ 0 & 0 & 0}.
+```
+
 
 So now, a product of skew-symmetric with orthogonal looks like:
-$$[P_\times] K = U \pmatrix{\lambda & 0 & 0 \\ 0 & \lambda & 0 \\ 0 & 0 & 0} \pmatrix{i & 0 & 0 \\ 0 & -i & 0 \\ 0 & 0 & 1} U^* K,$$
+
+```math
+[P_\times] K = U \pmatrix{\lambda & 0 & 0 \\ 0 & \lambda & 0 \\ 0 & 0 & 0} \pmatrix{i & 0 & 0 \\ 0 & -i & 0 \\ 0 & 0 & 1} U^* K,
+```
+
 which is a unitary $\times$ nonegative diagonal $\times$ unitary. If we are given this decomposition $[P_\times] K = U\Sigma V^T$, 
 then we can find $K$ by:
+
 $$K=U \pmatrix{-i & 0 & 0 \\ 0 & i & 0 \\ 0 & 0 & 1} V^T.$$
 
 Luckily for us, we have just the technique to find such decompositions: **The singular value decomposition**. However,
@@ -71,7 +85,9 @@ $$\pmatrix{\lambda i & 0 \\ 0 &-\lambda i} =\overbrace{\frac{1}{\sqrt{2}}\pmatri
 
 This means that we can push $Q$ (or its $3\times 3$ version) into $U$ above to get:
 
-$$[P_\times] K = (UQ) \pmatrix{0 & \lambda & 0 \\ -\lambda & 0 & 0 \\ 0 & 0 & 0} (UQ)^* K = (UQ) \pmatrix{\lambda & 0 & 0 \\ 0 & \lambda & 0 \\ 0 & 0 & 0} \pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & 1} (UQ)^* K.$$
+```math
+[P_\times] K = (UQ) \pmatrix{0 & \lambda & 0 \\ -\lambda & 0 & 0 \\ 0 & 0 & 0} (UQ)^* K = (UQ) \pmatrix{\lambda & 0 & 0 \\ 0 & \lambda & 0 \\ 0 & 0 & 0} \pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & 1} (UQ)^* K.
+```
 
 This is much better, since if we know that $UQ$ is a real matrix, then so will $K$.
 
@@ -82,21 +98,35 @@ Let $E=\alpha[P_\times]K$ and write its singular value decomposition $E=U\Sigma 
 - Since $E$ is real, we can find such decomposition where both $U,V$ are real.
 - $\Sigma$ is diagonal with nonegative entries.
 - To find the entries in $\Sigma$, we have:
+
   $$U\Sigma^2 U^T=EE^T=-\alpha^2[P_\times]^2.$$
   Conjugate matrices have the same eigenvalues, which on the right hand side are $0, (\alpha\lambda)^2, (\alpha\lambda)^2$.
   The eigenvalues of $\Sigma$ are the nonnegative square roots of these, so $0, \alpha\lambda, \alpha\lambda$, and up to reordering,
   we can assume that:
-  $$\Sigma = \alpha\lambda\pmatrix{1&0&0\\0&1&0\\0&0&0}$$
+```math 
+\Sigma = \alpha\lambda\pmatrix{1&0&0\\0&1&0\\0&0&0}
+```
 
 As in the intuition above, define $W_\pm$ to be
-$$W_\pm = \pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & \pm1},$$
+
+```math
+W_\pm = \pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & \pm1},
+```
+
 and note that $W_\pm^{-1}=W_\pm^T$, so it is orthogonal. We now have the decomposition
 
-$$E=U(\Sigma W_\pm) W_\pm^T V^T=\alpha\lambda \cdot U\pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & 0} (VW_\pm)^T,$$
+```math
+E=U(\Sigma W_\pm) W_\pm^T V^T=\alpha\lambda \cdot U\pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & 0} (VW_\pm)^T,
+```
 
 which is exactly the form that we expected to. Let us define
-$$\begin{align}\tilde{K}_\pm & =U(VW_\pm)^T \in \mathrm{O}_3(\mathbb{R})\\
-S & = F\tilde{K}_\pm^{-1}=U(\Sigma W_\pm) U^T = \alpha\lambda \cdot U \pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & 0} U^T\;.\end{align}$$
+
+```math
+\begin{align}\tilde{K}_\pm & =U(VW_\pm)^T \in \mathrm{O}_3(\mathbb{R})\\
+
+S & = F\tilde{K}_\pm^{-1}=U(\Sigma W_\pm) U^T = \alpha\lambda \cdot U \pmatrix{0 & 1 & 0 \\ -1 & 0 & 0 \\ 0 & 0 & 0} U^T\;.\end{align}
+```
+
 
 Since $\Sigma W_\pm$ is skew-symmetric, so is $S$, and note that it is independent of $\pm$ choice in $W_\pm$.
 
@@ -106,35 +136,49 @@ To summarize, we found a decomposition $E=S\cdot \tilde{K}_\pm$ as a skew symmet
 
 As mentioned before, we can write $S=[\tilde{P}_\times]$ for some $\tilde{P}\in\mathbb{R}^3$, so we just managed 
 to find that
-$$\alpha[P_\times]K = E = [\tilde{P}_\times]\tilde{K}_\pm.$$
-We have already shown that $P$ and $\tilde{P}$ are on the same line, namely $\tilde{P}=\beta P$ for some $\beta\in \mathbb{R}^\times$.
-It follows that 
-$$[P_\times]K = [P_\times]\frac{\beta}{\alpha}\tilde{K}_\pm\; \Rightarrow\; [P_\times] =[P_\times]\frac{\beta}{\alpha}\tilde{K}_\pm K^T.$$
 
-The matrix $[P_\times]$ has rank two, so it contains two independent (nonzero) rows $w_1^T, w_2^T$ (which generate $P^\perp$), for which 
+$$\alpha[P_ \times]K = E = [\tilde{P}_ \times] \tilde{K} _\pm.$$
+
+We have already shown that $P$ and $\tilde{P}$ are on the same line, namely $\tilde{P}=\beta P$ for some $\beta\in \mathbb{R}^\times$.
+It follows that
+
+```math
+[P_\times]K = [P_\times]\frac{\beta}{\alpha}\tilde{K}_\pm\; \Rightarrow\; [P_\times] =[P_\times]\frac{\beta}{\alpha}\tilde{K}_\pm K^T.
+```
+
+The matrix $[P_\times]$ has rank two, so it contains two independent (nonzero) rows $w_1^T, w_2^T$ (which generate $P^\perp$), for which
+
 $$w_i^T = w_i^T(\frac{\beta}{\alpha} \tilde{K}_\pm K^T).$$
+
 Using the fact that orthogonal matrices do not change the norm, we get that
+
 $$|w_i^T| = |w_i^T(\frac{\beta}{\alpha} \tilde{K}_\pm K^T)| = |w_i^T|\left|\frac{\beta}{\alpha}\right|,$$
+
 so that $\epsilon:=\frac{\beta}{\alpha} \in \{\pm 1\}$.
 
-The matrix $\epsilon\tilde{K}_\pm K^T$ is orthogonal and already fixes two directions which generate $P^\perp$.
+The matrix $\epsilon\tilde{K}_ \pm K^T$ is orthogonal and already fixes two directions which generate $P^\perp$.
 Hence, it must send the remaining vector $P$ to one of $\pm P$. As an exercise, you should check that this new $\pm$ sign
-is basically the same $\pm$ sign that we have been carrying inside the $W_\pm$ matrix. Indeed, we didn't care about that 
+is basically the same $\pm$ sign that we have been carrying inside the $W _ \pm$ matrix. Indeed, we didn't care about that 
 sign precisely because it "disappeared" when multiplied by the skew-symmetric part $S$.
 
 More formally, let $T_P$ be the reflection through the plane perpendicular to $P$, namely it fixes that plane,
 and switch the sign of $P$:
+
 $$T_P(v) = v-2\left\langle v, \frac{P}{|P|} \right\rangle \frac{P}{|P|}.$$
 
 ### Exercise:
 > With the notations from the previous section:
-> $$T_p=U\pmatrix{1&0&0 \\ 0&1&0 \\ 0&0&-1}U^T.$$
+> 
+> ```math
+> T_p=U\pmatrix{1&0&0 \\ 0&1&0 \\ 0&0&-1}U^T.
+> ```
 
 It follows that $\epsilon\tilde{K}_\pm K^T$ is either the identity or $T_P$. We can now put everything together.
 
 ### Claim:
 > Let $P,\tilde{P}\in \mathbb{R}^3$ be nonzero vectors, $K,\tilde{K} \in \mathrm{O}_3(\mathbb{R})$ orientations, and 
-> $\alpha\in \mathbb{R}^\times$ such that 
+> $\alpha\in \mathbb{R}^\times$ such that
+> 
 > $$\alpha[P_\times]K = [\tilde{P}_\times]\tilde{K}.$$
 > 
 > 1) The vectors $P$, $\tilde{P}$ are on the same line, namely $\tilde{P}=\beta P$, $\beta\neq 0$.
@@ -174,8 +218,8 @@ Yes and No:
   - Each of these choices separately are not possible in the 3D world (without using mirrors), but if we take both together
     it is actually possible (or formally, the product of two determinant $-1$ matrices has determinant 1).
 
-All in all, if we fix the scale of the world so that $|P|=1$ and choose $K\in\mathrm{SO}_3(\mathbb{R})$, there are 4 
-ways to write $[P_\times]K$ as $[\tilde{P}_\times]\tilde{K}$ with $|\tilde{P}|=1$ and $\tilde{K}\in\mathrm{SO}_3(\mathbb{R})$:
+All in all, if we fix the scale of the world so that $|P|=1$ and choose $K\in SO_3(\mathbb{R})$, there are 4 
+ways to write $[ P_\times ] K$ as $[\tilde{P}_\times]\tilde{K}$ with $|\tilde{P}|=1$ and $\tilde{K}\in\mathrm{SO}_3(\mathbb{R})$:
 
 - $[P_\times]K$
 - $[P_\times](-T_P\cdot K)$
