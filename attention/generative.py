@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 
 from general import model_tester
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 from typing import Dict, List, Iterator, Tuple, Optional
 import torch
 import torch.nn as nn
@@ -13,7 +12,6 @@ from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.functional as F
 
 from attention.text_data import TextData
-from attention.probabilistic import ProbModel
 
 class SimpleModel(nn.Module):
 
