@@ -36,7 +36,6 @@ class ProbModel:
         self.probabilities += epsilon
         self.probabilities /= self.probabilities.sum(axis = -1, keepdims=True)
 
-
     def generate(self, initial_message: List[int], num_letters: int):
         assert len(initial_message) == self.window_size
 
@@ -54,3 +53,6 @@ class ProbModel:
             indices.append(next_letter)
 
         return indices
+
+    def eval(self):
+        pass
