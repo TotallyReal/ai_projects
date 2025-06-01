@@ -3,7 +3,8 @@ from torch.utils.data import DataLoader
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from typing import Callable, List, Iterator
+from typing import Callable, List, Iterator, Optional
+import torch.nn.functional as F
 
 from misc import print_progress_bar
 from misc import time_me
@@ -33,72 +34,102 @@ default_training_parameters = TrainingParameters(
     learning_rate = 0.001
 )
 
+TrainStepCallback = Callable[[int, int, float],None]
+
 @time_me
 def train_model(
         model: nn.Module, data_loader: DataLoader, train_size: int = 0,
         parameters: TrainingParameters = default_training_parameters,
-        train_step_callback: Callable[[int, int],None] = empty_callback):
+        loss_function = nn.CrossEntropyLoss(),
+        train_step_callback: TrainStepCallback = empty_callback):
     """
     Runs the model on the given data, with the given epochs and learning rate.
     If train_size > 0, will print a progress bar during each epoch.
 
-    The train_step_callback(current_epoch, num_data_points) will be called after each step, where
+    The train_step_callback(current_epoch, num_data_points, loss) will be called after each step, where
     the number of data points is counted for the current epoch only.
-    At the finish of each epoch it will be called with num_data_points = -1
+    At the finish of each epoch it will be called with num_data_points = -1, and the total loss of that
+    epoch.
     """
     model = model.to(device)
 
-    loss_function = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=parameters.learning_rate)
 
     model.train()
 
     for epoch in range(parameters.epochs):
-        data_so_far = 0
+        num_samples = 0
+        total_loss = 0.0
         if train_size>0:
-            print_progress_bar(iteration=data_so_far, total=train_size)
+            print_progress_bar(iteration=num_samples, total=train_size)
         for X_train, Y_train in data_loader:
             X_train, Y_train = X_train.to(device), Y_train.to(device)
+            batch_size = len(Y_train)
 
             # Forward pass
             Y_pred = model(X_train)
             loss = loss_function(Y_pred, Y_train)
+            total_loss += loss.item() * batch_size
 
             # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            data_so_far += X_train.shape[0]
+            num_samples += batch_size
 
-            train_step_callback(epoch, data_so_far)
+            train_step_callback(epoch, num_samples, loss.item())
 
             if train_size>0:
                 # TODO: consider moving this into a callback
-                print_progress_bar(iteration=data_so_far, total=train_size)
-        train_step_callback(epoch, -1)
+                print_progress_bar(iteration=num_samples, total=train_size)
+        train_step_callback(epoch, -1, total_loss / num_samples)
 
-        print(f"Epoch [{epoch+1}/{parameters.epochs}], Loss: {loss.item():.4f}")
+        print(f"Epoch [{epoch+1}/{parameters.epochs}], Average Loss: {total_loss / num_samples:.4f}")
+
+# <editor-fold desc=" ------------------------ Loss functions ------------------------">
+
+# output of size (n,m)
+# predictions of size (n) with values in {0,...,m-1}
+LossFunction = Callable[[torch.Tensor, torch.Tensor], float]
+
+def error_rate_argmax(output: torch.Tensor, predictions: torch.Tensor) -> float:
+    return (torch.argmax(output, dim=1) != predictions).sum().item()/len(predictions)
+
+def error_rate_prob(output: torch.Tensor, predictions: torch.Tensor) -> float:
+    prob = F.softmax(output, dim=1)
+    n = len(prob)
+    return 1 - prob[torch.arange(n), predictions].sum().item()/n
+
+# </editor-fold>
 
 
 
 # Testing the model
-def test_model(model: nn.Module, test_loader: DataLoader):
+def test_model(
+        model: nn.Module, test_loader: DataLoader,
+        loss_function: Optional[LossFunction] = None):
+    if loss_function is None:
+        loss_function = error_rate_argmax
+
     model.eval()
     total_errors = 0
     total_samples = 0
+
+    total_loss = 0
 
     with torch.no_grad():
         for X_test, Y_test in test_loader:
             X_test, Y_test = X_test.to(device), Y_test.to(device)
 
             outputs = model(X_test)
-            predicted = torch.argmax(outputs, dim=1)
-
-            total_errors += (predicted != Y_test).sum().item()
+            total_loss += len(Y_test) * loss_function(outputs, Y_test)
+            # predicted = torch.argmax(outputs, dim=1)
+            #
+            # total_errors += (predicted != Y_test).sum().item()
             total_samples += len(Y_test)
 
         error_rate = total_errors/total_samples
-        print(f"Number of errors: {total_errors}/{total_samples} ~ {error_rate}")
+        # print(f"Number of errors: {total_errors}/{total_samples} ~ {error_rate}")
 
-    return error_rate
+    return total_loss/total_samples
 

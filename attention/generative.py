@@ -1,5 +1,5 @@
 import math
-
+import copy
 import matplotlib.pyplot as plt
 
 from general import model_tester
@@ -28,7 +28,7 @@ class SimpleModel(nn.Module):
         self.linear2 = nn.Linear(hidden, abc_size)
         # self.softmax = nn.Softmax(dim=1)
 
-        self.initial_state = self.state_dict()
+        self.initial_state = copy.deepcopy(self.state_dict())
 
     def initialize_state(self):
         self.load_state_dict(self.initial_state)
@@ -48,11 +48,13 @@ class SimpleModel(nn.Module):
 
         return x
 
-    def generate(self, initial_message: List[int], num_letters: int):
+    def generate(self, initial_message: List[int], num_letters: int, seed=0):
         assert len(initial_message) == self.window_size
 
         indices = [i for i in initial_message]
         self.eval()
+
+        np.random.seed(seed)
 
         for _ in range(num_letters):
             input = torch.tensor(indices[-self.window_size:])
@@ -87,7 +89,6 @@ class Transformer(nn.Module):
 
         pos = torch.eye(window_size)                        # (window_size, window_size)
         pos = self.positional_embedding(pos)                # (window_size, letter_dim)
-        position_vectors = self.positional_embedding
 
         # x is an (n, windows_size) array, with values in [0,..., abc_size)
         x = F.one_hot(x, self.abc_size).float()             # (n, window_size, abc_size)
@@ -127,41 +128,106 @@ class Transformer(nn.Module):
         return indices
 
 
+def test_learning_rates(
+        model: nn.Module,
+        train_loader: DataLoader, train_sample_size: int,
+        dev_loader: DataLoader,
+        num_epochs: int,
+        learning_rates: List[float],
+        loss_function: Optional[model_tester.LossFunction] = None
+) -> Dict[float, Tuple[float, float]]:
+    error_rates = dict()
+    for learning_rate in learning_rates:
+        print(f'\nTest learning rate {learning_rate}')
+        model.initialize_state()
+        model_tester.train_model(
+            model=model,
+            data_loader=train_loader,
+            train_size=train_sample_size,
+            parameters=model_tester.TrainingParameters(learning_rate=learning_rate, epochs=num_epochs)
+        )
 
+        train_error_rate = model_tester.test_model(
+            model=model,
+            test_loader=train_loader,
+            loss_function=loss_function
+        )
+        print(f'{train_error_rate=}')
+
+        dev_error_rate = model_tester.test_model(
+            model=model,
+            test_loader=dev_loader,
+            loss_function=loss_function
+        )
+        print(f'{dev_error_rate=}')
+        error_rates[learning_rate] = (train_error_rate, dev_error_rate)
+
+    return error_rates
 
 
 
 file_name = 'alice'
 total_letter_count = 10000
 initial_text = 'alice'
-window_size = 5
+window_size = 4
 initial_text = initial_text[:window_size]
 seed = 0
 
-window_size = 4
-processed_text = TextData(file_name=file_name)#, total_letter_count=total_letter_count)
-# Preparing the data
-X, Y = processed_text.get_data(window_size=window_size)
 
-# to torch
-X = torch.from_numpy(X.copy()).long() # The numpy array X is not writable, so we need to copy it before converting it to a pytorch array
-Y = torch.from_numpy(Y).long()
 
-dataset = TensorDataset(X, Y)
-train_dataset, test_dataset = torch.utils.data.random_split(dataset, lengths=[0.85, 0.15])
+def test_me():
+    processed_text = TextData(file_name=file_name)#, total_letter_count=total_letter_count)
+    # Preparing the data
+    X, Y = processed_text.get_data(window_size=window_size)
 
-train_sample_size = len(train_dataset)
-train_loader=DataLoader(train_dataset, batch_size=32, shuffle=False)
-test_loader=DataLoader(test_dataset, batch_size=32, shuffle=False)
+    # to torch
+    X = torch.from_numpy(X.copy()).long() # The numpy array X is not writable, so we need to copy it before converting it to a pytorch array
+    Y = torch.from_numpy(Y).long()
 
-window_size = 4
-from attention.probabilistic import ProbModel
-prob_model4 = ProbModel(abc_size=processed_text.abc_size, window_size=window_size)
-prob_model4.train(X, Y, epsilon=0.0001)
-test_error_rate = model_tester.test_model(
-    model=prob_model4,
-    test_loader=test_loader
-)
+    dataset = TensorDataset(X, Y)
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, lengths=[0.85, 0.15])
+
+    train_sample_size = len(train_dataset)
+    train_loader=DataLoader(train_dataset, batch_size=32, shuffle=False)
+    test_loader=DataLoader(test_dataset, batch_size=32, shuffle=False)
+    letter_dim = 10
+    hidden = 100
+
+    simple_model = SimpleModel(processed_text.abc_size, letter_dim=letter_dim, window_size=window_size, hidden=hidden)
+    print(simple_model.generate(initial_message=processed_text.to_int(initial_text), num_letters=100))
+    # print(simple_model.initial_state)
+    model_tester.train_model(
+        model=simple_model,
+        data_loader=train_loader,
+        train_size=train_sample_size,
+        parameters = model_tester.TrainingParameters(learning_rate=math.exp(-5), epochs=2)
+    )
+    print(simple_model.generate(initial_message=processed_text.to_int(initial_text), num_letters=100))
+    # print(simple_model.state_dict())
+    simple_model.initialize_state()
+    print(simple_model.generate(initial_message=processed_text.to_int(initial_text), num_letters=100))
+
+# loss_function = nn.CrossEntropyLoss()
+# model_probs = torch.tensor([[1,2,-1],[-1,0,-1]], dtype=float)
+# y_value = torch.tensor([2,1], dtype = int)
+# print(loss_function(model_probs, y_value))
+#
+# print(-math.log(math.exp(-1)/(math.exp(1)+math.exp(2)+math.exp(-1))))
+# print(-math.log(math.exp(0)/(math.exp(-1)+math.exp(0)+math.exp(-1))))
+# print(-(math.log(math.exp(-1)/(math.exp(1)+math.exp(2)+math.exp(-1))) +
+#       math.log(math.exp(0)/(math.exp(-1)+math.exp(0)+math.exp(-1))))/2)
+#
+# # test_me()
+# exit(0)
+
+
+# from attention.probabilistic import ProbModel
+# prob_model4 = ProbModel(abc_size=processed_text.abc_size, window_size=window_size)
+# prob_model4.train(X, Y, epsilon=0.0001)
+# test_error_rate = model_tester.test_model(
+#     model=prob_model4,
+#     test_loader=test_loader
+# )
 
 # <editor-fold desc=" ------------------------ Pair probabilities ------------------------">
 

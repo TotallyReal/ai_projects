@@ -155,7 +155,7 @@ class OutputProgressCollector:
             self.progress_output[linear_layer] = []
 
     # After each learning step, run the model on the test data and collect the output
-    def progress_callback(self, epoch: int, num_data_points: int):
+    def progress_callback(self, epoch: int, num_data_points: int, loss: float):
         self.model.eval()
         # collect linear layers output on the test dataset (one batch)
         with torch.no_grad():
