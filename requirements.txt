@@ -2,7 +2,7 @@ matplotlib~=3.10.0
 mplcursors~=0.6
 numpy~=2.0.2
 pandas~=2.2.3
-setuptools~=70.0.0
+setuptools~=80.3.1
 torch~=2.7.0
 torchvision~=0.22.0
 pillow~=11.2.1
@@ -10,3 +10,5 @@ opencv-python~=4.11.0.86
 scipy~=1.15.3
 seaborn~=0.13.2
 einops~=0.8.1
+
+-r attention/shaders/requirements.txt
