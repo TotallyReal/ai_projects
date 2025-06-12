@@ -1,18 +1,24 @@
 import glfw
+import os
 
-from attention.shaders.shader import GlWindow, UniformType, IndexedSaver
+from attention.shaders.shader import GlWindow, UniformType, ShaderInfo
 
 width = 512
 height = 256
 
-app_window = GlWindow(
-    width, height,
-    "Circle uv", "circle_uv.vert", "circle_uv.frag",
-    [
+shader_info = ShaderInfo.load_from(
+    vert_path='circle_uv.vert', frag_path='circle_uv.frag', folder=os.path.dirname(os.path.abspath(__file__)),
+    uniform_types=[
         ('u_resolution',              UniformType.VEC2),
         ('u_frame_buffer_resolution', UniformType.VEC2),
         ('u_radius',                  UniformType.FLOAT),
     ]
+)
+
+app_window = GlWindow(
+    shader_info=shader_info,
+    width=width, height=height,
+    title="Circle uv"
 )
 
 uniforms = {
@@ -20,7 +26,6 @@ uniforms = {
     'u_frame_buffer_resolution': [width, height],
     'u_radius'    : 10,
 }
-
 
 while not glfw.window_should_close(app_window.window):
     glfw.poll_events()

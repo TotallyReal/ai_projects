@@ -1,9 +1,15 @@
+import moderngl
 import glfw
 from OpenGL import GL
 from PIL import Image
 import os
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 from enum import Enum
+from dataclasses import dataclass
+
+
+# Did you know? Python is a garbage programming language. Always was and always will be.
+# I hate it with a passion, and it destroys my soul that I have to work with it.
 
 """
 A simple wrapper file to create shader windows, e.g.
@@ -21,8 +27,16 @@ app_window = GlWindow(
 )
 """
 
-def load_from_file(path: str):
-    with open(path, 'r') as f:
+def read_file(file_name: str, folder: Optional[str]=None) -> str:
+    if folder:
+        file_path = os.path.join(folder, file_name)
+    else:
+        file_path = file_name
+
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    with open(file_path, 'r', encoding='utf-8') as f:
         return f.read()
 
 def compile_shader(shader_type, source):
@@ -70,16 +84,63 @@ uniform_setters = {
 }
 
 
+@dataclass(frozen=True)
+class ShaderInfo:
+    vert_module: str
+    frag_module: str
+    uniform_types: List[Tuple[str, UniformType]]
+
+    @staticmethod
+    def load_from(
+            vert_path: str, frag_path: str, folder: str, uniform_types: List[Tuple[str, UniformType]]) -> 'ShaderInfo':
+        return ShaderInfo(
+            vert_module=read_file(vert_path, folder),
+            frag_module=read_file(frag_path, folder),
+            uniform_types=uniform_types
+        )
+
+    def generate_image(self, width: int, height: int, frag_uniforms=None, attributes=None):
+        ctx = moderngl.create_standalone_context()
+        prog = ctx.program(
+            vertex_shader=self.vert_module,
+            fragment_shader=self.frag_module,
+        )
+
+        if frag_uniforms is not None:
+            for name, value in frag_uniforms.items():
+                prog[name].value = value
+
+        if attributes and len(attributes) > 0:
+            # Assume 'attributes' is a dict: {attr_name: numpy_array}
+            buffers = []
+            for attr_name, array in attributes.items():
+                buffer = ctx.buffer(array.astype('f4').tobytes())
+                buffers.append((buffer, attr_name))
+            vao = ctx.vertex_array(prog, buffers)
+        else:
+            # No attributes used — gl_VertexID assumed
+            vao = ctx.vertex_array(prog, [])
+
+        fbo = ctx.simple_framebuffer((width, height))
+        fbo.use()
+        ctx.clear(0, 0, 0, 1)  # clear to black
+        vao.render(moderngl.TRIANGLES, vertices=3)
+
+        data = fbo.read(components=3)
+        image = Image.frombytes('RGB', (width, height), data)
+        image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        return image
+
+
 class GlWindow:
 
     """
     Generate a window containing an OpenGL shader.
     """
     def __init__(
-            self, width: int, height: int,
-            title: str, vert_path: str, frag_path: str,
-            uniforms: List[Tuple[str, UniformType]],
-            visible: bool = True
+            self, shader_info: ShaderInfo ,
+            width: int, height: int,
+            title: str, visible: bool = True
     ):
         if not glfw.init():
             raise Exception("GLFW can't be initialized")
@@ -107,22 +168,20 @@ class GlWindow:
         print("OpenGL Version:", GL.glGetString(GL.GL_VERSION).decode())
         print("GLSL Version:", GL.glGetString(GL.GL_SHADING_LANGUAGE_VERSION).decode())
 
-        self.vao = GL.glGenVertexArrays(1)
-        GL.glBindVertexArray(self.vao)
+        self._vao = GL.glGenVertexArrays(1)
+        GL.glBindVertexArray(self._vao)
 
-        # Compile and link shaders
-        vs = compile_shader(GL.GL_VERTEX_SHADER, load_from_file(vert_path))
-        fs = compile_shader(GL.GL_FRAGMENT_SHADER, load_from_file(frag_path))
-
+        # Compile and link shader modules
+        self.shader_info = shader_info
         self.program = GL.glCreateProgram()
-        GL.glAttachShader(self.program, vs)
-        GL.glAttachShader(self.program, fs)
+        GL.glAttachShader(self.program, compile_shader(GL.GL_VERTEX_SHADER, shader_info.vert_module))
+        GL.glAttachShader(self.program, compile_shader(GL.GL_FRAGMENT_SHADER, shader_info.frag_module))
         GL.glLinkProgram(self.program)
 
         self.local_uniforms_setters = {
             uniform_name: (lambda value, uname=uniform_name, utype=uniform_type:
                            uniform_setters[utype](GL.glGetUniformLocation(self.program, uname), value))
-            for uniform_name, uniform_type in uniforms
+            for uniform_name, uniform_type in shader_info.uniform_types
         }
 
         self.mouse_events = MouseEvents(self)
@@ -132,7 +191,7 @@ class GlWindow:
         GL.glViewport(0, 0, fb_width, fb_height)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         GL.glUseProgram(self.program)
-        GL.glBindVertexArray(self.vao)
+        GL.glBindVertexArray(self._vao)
 
     def set_uniform(self, name: str, value):
         self.local_uniforms_setters[name](value)
@@ -141,11 +200,12 @@ class GlWindow:
         GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
         glfw.swap_buffers(self.window)
 
-    def draw_screen(self, uniforms):
+    def draw_screen(self, uniforms = None):
         self.render_start()
 
-        for name, value in uniforms.items():
-            self.set_uniform(name, value)
+        if uniforms is not None:
+            for name, value in uniforms.items():
+                self.set_uniform(name, value)
 
         self.render_complete()
 
@@ -153,16 +213,16 @@ class GlWindow:
         return GL.glGetUniformLocation(self.program, name)
 
     def generate_image(self):
-        fb_width, fb_height = glfw.get_framebuffer_size(self.window)
+        """
+        Note that the size of the generated image is the size of the frame buffer, and not the pixel size of the image.
+        """
+        target_width, target_height = glfw.get_framebuffer_size(self.window)
         GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
         GL.glPixelStorei(GL.GL_PACK_ALIGNMENT, 1)
-        data = GL.glReadPixels(0, 0, fb_width, fb_height, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
-        image = Image.frombytes("RGB", (fb_width, fb_height), data)
+        data = GL.glReadPixels(0, 0, target_width, target_height, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
+        image = Image.frombytes("RGB", (target_width, target_height), data)
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
         return image
-
-    def set_scroll_callback(self, scroll_callback):
-        glfw.set_scroll_callback(self.window, scroll_callback)
 
 # <editor-fold desc="Events">
 
@@ -259,8 +319,8 @@ class IndexedSaver:
         self.name = name
         self.index = 0
 
-    def save_image(self, image):
-        path = os.path.join(self.folder, f'{self.name}_{self.index}.jpg')
+    def save_image(self, image, extension: str = 'jpg'):
+        path = os.path.join(self.folder, f'{self.name}_{self.index}.{extension}')
         image.save(path)
         print(f"Saved to {path}")
         self.index += 1

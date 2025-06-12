@@ -12,11 +12,9 @@ const float SMOOTH = 2;
 precision mediump float;
 #endif
 
-uniform vec2 u_resolution;
 uniform vec2 u_dimension;
 uniform vec2 u_position;
 uniform vec2 u_constant;
-uniform float u_density;
 uniform float u_color_wave;
 
 /**
@@ -86,10 +84,12 @@ void main() {
 	}
 	float inc = min(norm/float(RADIUS)-1.,float(SMOOTH))/float(SMOOTH);
 	iterations = iterations - inc;
-    vec3 hsbColor = vec3(iterations/float(MAX_ITERATIONS),(1.0-u_color_wave) + u_color_wave*float(RADIUS)/norm,1.0);
 
-//    gl_FragColor = vec4(hsb2rgb(hsbColor), 1.0);
-	float value = 1.-iterations/float(MAX_ITERATIONS);
-	fragColor = vec4(value, value, value, 1.0);
+    vec3 color = vec3(1.-iterations/float(MAX_ITERATIONS));
+    if (u_color_wave >= 0){
+        color = hsb2rgb(vec3(iterations/float(MAX_ITERATIONS),(1.0-u_color_wave) + u_color_wave*float(RADIUS)/norm,1.0));
+    }
+
+	fragColor = vec4(color, 1.0);
 
 }
