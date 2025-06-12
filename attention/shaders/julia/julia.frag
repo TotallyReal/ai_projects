@@ -68,11 +68,11 @@ vec3 hsb2rgb(in vec3 c){
     return c.z * mix( vec3(1.0), rgb, c.y);
 }
 
+in vec2 v_uv;
+out vec4 fragColor;
+
 void main() {
-	// Compute the position in the complex plane.
-	// The screen should show the rectangle with top left corner at u_position and dimension u_dimension.
-	vec2 normalizePos = gl_FragCoord.xy/u_resolution.xy;
-	normalizePos/=u_density;
+	vec2 normalizePos = v_uv;
 	normalizePos.y = 1.0-normalizePos.y;
 	normalizePos = u_dimension*normalizePos+u_position;
 
@@ -81,7 +81,7 @@ void main() {
 	float norm = result.y;
 	if (iterations<0.0){
 		//didn't get outside of ${RADIUS} - use black.
-		gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+		fragColor = vec4(0.0,0.0,0.0,1.0);
 		return;
 	}
 	float inc = min(norm/float(RADIUS)-1.,float(SMOOTH))/float(SMOOTH);
@@ -90,6 +90,6 @@ void main() {
 
 //    gl_FragColor = vec4(hsb2rgb(hsbColor), 1.0);
 	float value = 1.-iterations/float(MAX_ITERATIONS);
-	gl_FragColor = vec4(value, value, value, 1.0);
+	fragColor = vec4(value, value, value, 1.0);
 
 }

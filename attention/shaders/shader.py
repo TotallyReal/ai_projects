@@ -5,6 +5,22 @@ import os
 from typing import List, Tuple, Callable
 from enum import Enum
 
+"""
+A simple wrapper file to create shader windows, e.g.
+
+app_window = GlWindow(
+    width, height,
+    "Title", "shader.vert", "shader.frag",
+    [
+        ('u_resolution', UniformType.VEC2),
+        ('u_dimension',  UniformType.VEC2),
+        ('u_position',   UniformType.VEC2),
+        ('u_time',       UniformType.FLOAT),
+        ...
+    ]
+)
+"""
+
 def load_from_file(path: str):
     with open(path, 'r') as f:
         return f.read()
@@ -56,13 +72,28 @@ uniform_setters = {
 
 class GlWindow:
 
+    """
+    Generate a window containing an OpenGL shader.
+    """
     def __init__(
             self, width: int, height: int,
             title: str, vert_path: str, frag_path: str,
-            uniforms: List[Tuple[str, UniformType]]
+            uniforms: List[Tuple[str, UniformType]],
+            visible: bool = True
     ):
         if not glfw.init():
             raise Exception("GLFW can't be initialized")
+
+        # Set OpenGL context to version 3.3 core, required on macOS for GLSL 330+
+        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+
+        # macOS requires this hint for core profile contexts
+        if os.uname().sysname == 'Darwin':
+            glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL.GL_TRUE)
+
+        glfw.window_hint(glfw.VISIBLE, glfw.TRUE if visible else glfw.FALSE)
 
         self.window = glfw.create_window(width, height, title, None, None)
         if not self.window:
@@ -73,6 +104,11 @@ class GlWindow:
         self.height = height
 
         glfw.make_context_current(self.window)
+        print("OpenGL Version:", GL.glGetString(GL.GL_VERSION).decode())
+        print("GLSL Version:", GL.glGetString(GL.GL_SHADING_LANGUAGE_VERSION).decode())
+
+        self.vao = GL.glGenVertexArrays(1)
+        GL.glBindVertexArray(self.vao)
 
         # Compile and link shaders
         vs = compile_shader(GL.GL_VERTEX_SHADER, load_from_file(vert_path))
@@ -83,7 +119,6 @@ class GlWindow:
         GL.glAttachShader(self.program, fs)
         GL.glLinkProgram(self.program)
 
-        self.uniform_locations = {}
         self.local_uniforms_setters = {
             uniform_name: (lambda value, uname=uniform_name, utype=uniform_type:
                            uniform_setters[utype](GL.glGetUniformLocation(self.program, uname), value))
@@ -92,11 +127,12 @@ class GlWindow:
 
         self.mouse_events = MouseEvents(self)
 
-
     def render_start(self):
-        GL.glViewport(0, 0, self.width, self.height)
+        fb_width, fb_height = glfw.get_framebuffer_size(self.window)
+        GL.glViewport(0, 0, fb_width, fb_height)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         GL.glUseProgram(self.program)
+        GL.glBindVertexArray(self.vao)
 
     def set_uniform(self, name: str, value):
         self.local_uniforms_setters[name](value)
@@ -105,19 +141,30 @@ class GlWindow:
         GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
         glfw.swap_buffers(self.window)
 
+    def draw_screen(self, uniforms):
+        self.render_start()
+
+        for name, value in uniforms.items():
+            self.set_uniform(name, value)
+
+        self.render_complete()
+
     def get_uniform_location(self, name: str):
         return GL.glGetUniformLocation(self.program, name)
 
     def generate_image(self):
-        GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)  # ??? read data from back buffer
+        fb_width, fb_height = glfw.get_framebuffer_size(self.window)
+        GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
         GL.glPixelStorei(GL.GL_PACK_ALIGNMENT, 1)
-        data = GL.glReadPixels(0, 0, self.width, self.height, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
-        image = Image.frombytes("RGB", (self.width, self.height), data)
-        image = image.transpose(Image.FLIP_TOP_BOTTOM)  # OpenGL origin is bottom-left
+        data = GL.glReadPixels(0, 0, fb_width, fb_height, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
+        image = Image.frombytes("RGB", (fb_width, fb_height), data)
+        image = image.transpose(Image.FLIP_TOP_BOTTOM)
         return image
 
     def set_scroll_callback(self, scroll_callback):
         glfw.set_scroll_callback(self.window, scroll_callback)
+
+# <editor-fold desc="Events">
 
 def _invoke(listeners, *parameters):
     for callback in listeners:
@@ -133,6 +180,16 @@ MouseDraggedCallback = Callable[[GlWindow, float, float, float, float], None]
 MouseScrollCallback = Callable[[GlWindow, float, float, float], None]
 
 class MouseEvents:
+    """
+    Support mouse event for the GL_Window, by adding listeners to:
+        mouse_pressed_listeners   (MouseButtonCallback)
+        mouse_released_listeners  (MouseButtonCallback)
+        mouse_dragged_listeners   (MouseDraggedCallback)
+        mouse_moved_listeners     (MouseDraggedCallback)
+        mouse_scrolled_listeners  (MouseScrollCallback)
+
+    Also, the press status is saved in `is_pressed`, and position in `position()`.
+    """
 
     def __init__(self, gl_window: GlWindow):
         assert gl_window is not None
@@ -171,7 +228,6 @@ class MouseEvents:
 
         self.last_position = (x,y)
 
-
     def _mouse_moved(self, window: glfw._GLFWwindow, x: float, y: float):
 
         x, y = self.position()
@@ -188,9 +244,14 @@ class MouseEvents:
         mouse_x, mouse_y = self.position()
         _invoke(self.mouse_scrolled_listeners, self.gl_window, mouse_x, mouse_y, y_scroll)
 
+# </editor-fold>
 
+# TODO: Move to another file
 
 class IndexedSaver:
+    """
+    Used to save images with the same name, and running index.
+    """
 
     def __init__(self, folder: str, name: str):
         self.folder = folder
@@ -204,58 +265,3 @@ class IndexedSaver:
         print(f"Saved to {path}")
         self.index += 1
 
-# Parameters
-speed = 2.0
-amplitude = 0.9
-wavelength = 0.15
-
-saver = IndexedSaver('data', 'julia')
-
-def main():
-    window1 = GlWindow(
-        512, 512,
-        "Julia set", "julia.vert", "julia.frag",
-        [
-            ('u_resolution', UniformType.VEC2),
-            ('u_dimension', UniformType.VEC2),
-            ('u_position', UniformType.VEC2),
-            ('u_constant', UniformType.VEC2),
-            ('u_density', UniformType.FLOAT),
-            ('u_color_wave', UniformType.FLOAT),
-        ]
-    )
-
-    start_time = glfw.get_time()
-
-    while not glfw.window_should_close(window1.window):
-        glfw.poll_events()
-        time = glfw.get_time() - start_time
-
-        # Key handling
-        if glfw.get_key(window1.window, glfw.KEY_S) == glfw.PRESS:
-            image = window1.generate_image()
-            saver.save_image(image)
-
-            glfw.wait_events_timeout(0.2)  # debounce
-
-        # Render
-        window1.render_start()
-
-        window1.set_uniform('u_resolution', [512, 512])
-        window1.set_uniform('u_dimension', [2.4,2.4])
-        window1.set_uniform('u_position', [-1.2,-1.2])
-        window1.set_uniform('u_constant', [-0.37,-0.36])
-        window1.set_uniform('u_density', 1)
-        window1.set_uniform('u_color_wave', 0)
-
-
-        # window1.set_uniform('iTime', time)
-        # window1.set_uniform('speed', speed)
-        # window1.set_uniform('amplitude', amplitude)
-        # window1.set_uniform('wavelength', wavelength)
-        window1.render_complete()
-
-    glfw.terminate()
-
-if __name__ == "__main__":
-    main()
