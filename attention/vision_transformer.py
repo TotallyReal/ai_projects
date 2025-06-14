@@ -6,6 +6,7 @@ from einops.layers.torch import Rearrange
 import einops
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+import copy
 from typing import List
 
 class Attention(nn.Module):
@@ -124,6 +125,10 @@ class VisionTransformer(nn.Module):
             nn.Linear(emb_dim, 1)
         )
 
+        self.register_buffer("pos", torch.eye(self.num_patches))         # (num_patches, num_patches)
+
+        self.initial_state = copy.deepcopy(self.state_dict())
+
 
     def forward(self, x: torch.Tensor):
 
@@ -156,18 +161,13 @@ class VisionTransformer(nn.Module):
 
         return x
 
-# def temp():
-#     image_size = 256
-#     num_channels = 1
-#     num_batches = 1
-#
-#     input = torch.randn(size=(num_batches,num_channels,image_size,image_size))
-#
-#     model = VisionTransformer(image_size=image_size, image_channels=num_channels, patch_size=16, emb_dim=10)
-#     model(input)
-#
-#
-# temp()
+    def update_init_state(self):
+        self.initial_state = copy.deepcopy(self.state_dict())
+
+    def initialize_state(self):
+        self.load_state_dict(self.initial_state)
+
+
 
 
 class MyImageDataset(Dataset):

@@ -3,6 +3,7 @@ import numpy as np
 from typing import Dict, List, Iterator, Tuple, Optional
 import torch
 import torch.nn as nn
+import copy
 
 class RotationLayer(nn.Module):
     def __init__(self, theta: float):
@@ -92,7 +93,7 @@ class SimpleClassifier(nn.Module):
 
         self.softmax = nn.Softmax(dim=1)
 
-        self.initial_state = self.state_dict()
+        self.initial_state = copy.deepcopy(self.state_dict())
 
     def initialize_state(self):
         self.load_state_dict(self.initial_state)
