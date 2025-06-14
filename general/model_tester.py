@@ -9,9 +9,26 @@ import torch.nn.functional as F
 from misc import print_progress_bar
 from misc import time_me
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def get_device(verbose=False):
+    """
+    Returns the best available PyTorch device.
+    Priority: CUDA > MPS > CPU.
+    """
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        if verbose:
+            print(f"Using CUDA device: {torch.cuda.get_device_name(device)}")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+        if verbose:
+            print("Using Apple MPS device (Metal Performance Shaders)")
+    else:
+        device = torch.device("cpu")
+        if verbose:
+            print("Using CPU")
+    return device
 
-def empty_callback(epoch: int, num_data_points: int):
+def empty_callback(epoch: int, num_data_points: int, current_loss):
     pass
 
 @dataclass
@@ -51,6 +68,7 @@ def train_model(
     At the finish of each epoch it will be called with num_data_points = -1, and the total loss of that
     epoch.
     """
+    device = get_device()
     model = model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=parameters.learning_rate)
@@ -111,25 +129,22 @@ def test_model(
     if loss_function is None:
         loss_function = error_rate_argmax
 
-    model.eval()
-    total_errors = 0
-    total_samples = 0
+    device = get_device()
+    model = model.to(device)
 
-    total_loss = 0
+    model.eval()
+    total_samples = 0
+    total_loss = 0.0
 
     with torch.no_grad():
         for X_test, Y_test in test_loader:
             X_test, Y_test = X_test.to(device), Y_test.to(device)
 
             outputs = model(X_test)
-            total_loss += len(Y_test) * loss_function(outputs, Y_test)
-            # predicted = torch.argmax(outputs, dim=1)
-            #
-            # total_errors += (predicted != Y_test).sum().item()
-            total_samples += len(Y_test)
+            batch_size = Y_test.size(0)
 
-        error_rate = total_errors/total_samples
-        # print(f"Number of errors: {total_errors}/{total_samples} ~ {error_rate}")
+            total_loss += batch_size * loss_function(outputs, Y_test)
+            total_samples += batch_size
 
     return total_loss/total_samples
 
