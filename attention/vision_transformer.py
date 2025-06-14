@@ -1,7 +1,5 @@
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from IPython.core.pylabtools import figsize
 from einops.layers.torch import Rearrange
 import einops
 import torch.nn.functional as F
@@ -94,10 +92,9 @@ class Transformer(nn.Module):
         x = self.feed_forward_step(x)
         return x
 
-
 class VisionTransformer(nn.Module):
 
-    def __init__(self, image_size: int, image_channels: int, patch_size: int, emb_dim: int):
+    def __init__(self, image_size: int, image_channels: int, patch_size: int, emb_dim: int, output_dim: int):
         super(VisionTransformer, self).__init__()
 
         assert image_size % patch_size == 0, f'Patch size {patch_size} needs to divide the image size {image_size}'
@@ -122,7 +119,7 @@ class VisionTransformer(nn.Module):
 
         self.final_layer = nn.Sequential(
             nn.LayerNorm(emb_dim),
-            nn.Linear(emb_dim, 1)
+            nn.Linear(emb_dim, output_dim)
         )
 
         self.register_buffer("pos", torch.eye(self.num_patches))         # (num_patches, num_patches)
@@ -139,14 +136,11 @@ class VisionTransformer(nn.Module):
         # 3. Position data: add data according to position in image
         # 4. Attention: Combine data with previous tokens
 
-
-        pos = torch.eye(self.num_patches)                   # (num_patches, num_patches)
-        pos = self.positional_embedding(pos)                # (num_patches, emb_size)
-
         # input : x                                         # (n, c, image_size, image_size)
         x = self.patcher(x)                                 # (n, num_patches, (patch_size * patch_size * channels))
         x = self.linearizer(x)                              # (n, num_patches, emb_size)
-        x += pos                                            # (n, num_patches, emb_size)    TODO
+        pos_embedd = self.positional_embedding(self.pos)    # (num_patches, emb_size)
+        x += pos_embedd                                     # (n, num_patches, emb_size)
 
         num_batches, num_patches, _ = x.shape
 
@@ -157,7 +151,7 @@ class VisionTransformer(nn.Module):
         x = self.transformer(x)                             # (n, num_patches + 1, emb_size)
         x = x[:, 0, :]                                      # (n, emb_size)
 
-        x = self.final_layer(x)                             # (n, 1)
+        x = self.final_layer(x)                             # (n, output_dim)
 
         return x
 
