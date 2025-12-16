@@ -3,7 +3,7 @@
 Consider the following problem:
 
 ### Problem:
-> We are given some scene we which we from two different point of view in our 3D world.
+> We take pictures of a scene from two different point of view in our 3D world.
 > Each one produces a 2D image. Can we use these 2 images do determine the positions and orientations
 > of the 2 points of view?
 
